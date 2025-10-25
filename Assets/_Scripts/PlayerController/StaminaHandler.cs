@@ -26,12 +26,12 @@ public class StaminaHandler : MonoBehaviour
     }
 
 
-    private void RegenerateStamina(float amount)
+    public void RegenerateStamina(float amount)
     {
         current += amount;
     }
 
-    private void ConsumeStamina(float amount)
+    public void ConsumeStamina(float amount)
     {
         current -= amount;
     }

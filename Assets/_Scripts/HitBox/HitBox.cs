@@ -3,8 +3,12 @@ using UnityEngine;
 public class HitBox : MonoBehaviour
 {
     public float currentHealth;
-    public float maxHealth = 100f;
+    public float maxHealth = 100f; 
 
+    private void Awake()
+    {
+        currentHealth = maxHealth;
+    }
 
     public void TakeDamage(float damage)
     {

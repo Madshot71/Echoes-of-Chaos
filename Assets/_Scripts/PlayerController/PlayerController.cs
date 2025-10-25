@@ -9,22 +9,39 @@ public class PlayerController : MonoBehaviour
 {
     [Header("Settings")]
     [Require][SerializeField] private ControllerConfig config;
+    public ControllerCamera camController;
 
-    [Header("Settings")]
+    [Header("Debug")]
     [SerializeField] private float slope;
     [SerializeField] private bool _grounded;
     [SerializeField] private bool isLanded;
 
-    private Vector3 groundNormals;
-    public Rigidbody _rigidbody { get; private set; }
-    private CapsuleCollider _collider;
-    public Animator animator{ get; private set; }
-    public HitBox hitBox{ get; private set; }
+    //public 
+    public HitBox hitBox { get; private set; }
+    public WeaponSystem weaponSystem { get; private set; }
     public StaminaHandler staminaHandler { get; private set; }
     public CharacterBase _characterBase { get; private set; }
+    public Rigidbody _rigidbody { get; private set; }
+    public Animator animator { get; private set; }
     public InputReceiver receiver;
     public MovementState currentMovementState;
-    private Transform _camera => Camera.main.transform;
+
+    //private
+    private Vector3 groundNormals;
+    private CapsuleCollider _collider;
+    private Transform _camera => camController ? camController.follow : headDirection;
+
+    private float airTime;
+
+    private const string 
+    CrouchParam  = "isCrouching",
+    ProneParam = "isProne",
+    InteractParam ="isInteracting",
+    JumpParam = "isJumping"; 
+
+
+    // For AI use
+    private Transform headDirection;
 
     public enum MovementState
     {
@@ -41,11 +58,29 @@ public class PlayerController : MonoBehaviour
         _collider ??= GetComponent<CapsuleCollider>();
         animator ??= GetComponent<Animator>();
         hitBox ??= GetComponent<HitBox>();
+        
+
+        //Set Collider
+        SetCollider(new Vector3(0, config.defaultColliderCenterY, 0), config.defaultHeight);
+
+        _rigidbody.freezeRotation = true;
+    }
+
+    private void Awake()
+    {
+        TryGetComponent<StaminaHandler>(out StaminaHandler stamina);
+        TryGetComponent<WeaponSystem>(out WeaponSystem weapon);
+
+        this.weaponSystem ??= weapon;
+        this.staminaHandler ??= stamina;
+
+        
+        headDirection ??= new GameObject("AI_Direction").transform;
     }
 
     private void Start()
     {
-        currentMovementState = MovementState.Idle; 
+        currentMovementState = MovementState.Idle;
     }
 
     private void Update()
@@ -54,6 +89,8 @@ public class PlayerController : MonoBehaviour
         {
             return;
         }
+
+        HandleFallingAndLanding();
 
         //Actions
         JumpAction(); 
@@ -101,6 +138,7 @@ public class PlayerController : MonoBehaviour
         {
             return;
         }
+        currentMovementState = MovementState.Idle;
     }
 
     #region Physics
@@ -108,7 +146,9 @@ public class PlayerController : MonoBehaviour
     private void Movement()
     {
         Vector3 direction = _camera.forward * receiver.movementInput.y + _camera.right * receiver.movementInput.x;
-        direction.y = config.antiBump;
+        direction.y = 0;
+
+        direction += Vector3.down * config.antiBump;
         direction.Normalize();
 
         //check if were sprinting
@@ -127,12 +167,12 @@ public class PlayerController : MonoBehaviour
         else if (currentMovementState == MovementState.Prone)
         {
             speed = config.proneSpeed;
-            staminaHandler.ConsumeStamina(5f * Time.fixedDeltaTime);
         }
         else if (receiver.sprintInput && canSprint() && receiver.movementInput.y > 0)
         {
             speed = config.sprintSpeed;
             currentMovementState = MovementState.Sprinting;
+            staminaHandler?.ConsumeStamina(config.sprintStaminaCost * Time.fixedDeltaTime);
         }
 
         if(speed == 0)
@@ -140,8 +180,8 @@ public class PlayerController : MonoBehaviour
             ResetMovementState();
         }
 
-        //appling force
-        _rigidbody.AddForce(direction * speed);
+        //applying force
+        _rigidbody.velocity = direction * speed;
     }
 
     private void Rotate()
@@ -169,46 +209,88 @@ public class PlayerController : MonoBehaviour
 
         Vector2 movement = new Vector2(receiver.movementInput.x, receiver.movementInput.y);
 
-        if (receiver.sprintInput && canSprint())
-        {
-            horizontal = Mathf.Lerp(horizontal, 2, config.animationSmoothSpeed * Time.deltaTime);
-        }
-
         horizontal = Mathf.Lerp(horizontal, movement.x, config.animationSmoothSpeed * Time.deltaTime);
 
+        if (receiver.sprintInput && canSprint() && movement.y > 0)
+        {
+            vertical = Mathf.Lerp(vertical, 2, config.animationSmoothSpeed * Time.deltaTime);
+        }
+        else
+        {
+            vertical = Mathf.Lerp(vertical, movement.y, config.animationSmoothSpeed * Time.deltaTime);
+        }
+        
         animator.SetFloat("Horizontal", ClampAbs(horizontal, 0.05f));
         animator.SetFloat("Vertical", ClampAbs(vertical, 0.05f));
     }
 
     private void HandleFallingAndLanding()
     {
-        if(config.isJumping(this) || config.isInteracting(this))
+        if(ParamOn(InteractParam))
         {
+            if (ParamOn(JumpParam) && isGrounded(out RaycastHit landHit))
+            {
+                animator.SetBool(JumpParam, false);
+                HandleJumpLanding();
+            }
+            else if (airTime > config.fallDamageTime)
+            {
+                //Apply fall Damage
+                hitBox.TakeDamage(5 * (airTime - config.fallDamageTime));
+            }
+            
             return;
         }
 
         if (isGrounded(out RaycastHit hit))
         {
-            if (!isLanded)
+            if (isLanded == false)
             {
                 isLanded = true;
                 PlayTargetAnimation(config.landAnimation, true);
             }
 
+            airTime = 0f;
             slope = Vector3.Angle(hit.normal, Vector3.up);
             groundNormals = hit.normal;
             _grounded = true;
             return;
         }
 
+        airTime += Time.deltaTime;
         slope = 0;
         isLanded = false; 
         groundNormals = Vector3.zero;
-        _grounded = false; 
+        _grounded = false;
         _rigidbody.AddForce(Vector3.down * config.fallSpeed);
+        PlayTargetAnimation("Fall", true, false);
     }
-    
 
+    private void HandleJumpLanding()
+    {
+        if (currentMovementState == MovementState.Walking)
+        {
+            //normal landing
+            PlayTargetAnimation("forwardLanding", true, false);
+        }
+        else if (currentMovementState == MovementState.Sprinting)
+        {
+            //Sprinting 
+            if (airTime > 2f)
+            {
+                PlayTargetAnimation("RollLandin", true, false);
+            }
+            else
+            {
+                PlayTargetAnimation("forwardLanding", true, false);
+            }
+        }
+        else
+        {
+            //idle landing
+            PlayTargetAnimation("Land", true, false);
+        }
+    }
 
     #region Actions
 
@@ -235,32 +317,37 @@ public class PlayerController : MonoBehaviour
             PlayTargetAnimation(config.sprintJumpAnimation, true, false);
             return;
         }
-        
+
         PlayTargetAnimation(config.jumpAnimation, true, false);
     }
     
     public void TriggerJumpPhysics()
     {
+        float JumpStaminaMulti = 1;
         switch (currentMovementState)
         {
             case MovementState.Idle:
                 _rigidbody.AddForce(transform.up * config.jumpForceUp,
-                     ForceMode.Impulse);
-                return;
-                     
+                    ForceMode.Impulse);
+                break;
+
             case MovementState.Sprinting:
                 _rigidbody.AddForce(transform.up * config.jumpForceUp + transform.forward * config.jumpForceForward,
-                     ForceMode.Impulse);
-                return;
+                    ForceMode.Impulse);
+                JumpStaminaMulti = 1.5f;
+                break;
 
             case MovementState.Walking:
                 _rigidbody.AddForce(transform.up * config.jumpForceUp + transform.forward * (config.jumpForceForward / 2),
-                     ForceMode.Impulse);
-                return;
+                    ForceMode.Impulse);
+                JumpStaminaMulti = 1.2f;
+                break;
 
             default:
-                return;
+                break;
         }
+
+        staminaHandler?.ConsumeStamina(config.jumpStaminaCost * JumpStaminaMulti);
     }
 
     private bool SlideCompleted = false;
@@ -271,7 +358,7 @@ public class PlayerController : MonoBehaviour
 
         // Only allow holding slide if sliding, grounded, sprinting, not crouching, not jumping, and not using root motion
         if (!_grounded || currentMovementState == MovementState.Crouching ||
-            currentMovementState == MovementState.Prone || receiver.crouchInput || config.isJumping(this) || animator.applyRootMotion)
+            currentMovementState == MovementState.Prone || receiver.crouchInput || ParamOn(JumpParam) || animator.applyRootMotion)
             return;
 
         //this makes sure slide is only done once if the key is held
@@ -282,11 +369,12 @@ public class PlayerController : MonoBehaviour
         }
 
         // If slide input is pressed and not interacting, start slide animation and set up collider
-        if (receiver.slideInput && receiver.sprintInput && SlideCompleted == true && !config.isInteracting(this) && isSliding == false)
+        if (receiver.slideInput && receiver.sprintInput && SlideCompleted == true && !ParamOn(InteractParam) && isSliding == false)
         {
             PlayTargetAnimation(config.slideAnimation, true, false);
             animator.SetBool("isSliding", true);
             SlideCompleted = false;
+            staminaHandler?.ConsumeStamina(config.slideStaminaCost);
 
             // Force crouch collider state during slide
             SetCollider(new Vector3(0, config.crouchColliderCenterY, 0), config.crouchHeight);
@@ -297,13 +385,13 @@ public class PlayerController : MonoBehaviour
         // Apply sliding force
         if (isSliding && receiver.slideInput)
         {
-            // Only apply downslope force if on a slope
+            // Only apply down slope force if on a slope
             if (slope > config.minSlideAngle && slope < config.maxSlideAngle && holdSlide)
             {
-                // Calculate downslope direction
+                // Calculate down slope direction
                 Vector3 downslopeDir = Vector3.ProjectOnPlane(Vector3.down, groundNormals).normalized;
 
-                // Blend between downslope and player's forward direction (favoring downslope more as slope gets steeper)
+                // Blend between down slope and player's forward direction (favoring downslope more as slope gets steeper)
                 float slopeT = Mathf.InverseLerp(config.minSlideAngle, config.maxSlideAngle, slope);
                 Vector3 slideDir = Vector3.Slerp(transform.forward, downslopeDir, slopeT).normalized;
 
@@ -318,7 +406,7 @@ public class PlayerController : MonoBehaviour
 
         if (receiver.sprintInput == false)
         {
-            if (config.isInteracting(this) == false)
+            if (ParamOn(InteractParam) == false)
             {
                 // If not sliding, ensure the capsule collider is reset to normal height
                 ResetToIdleCollider();
@@ -332,6 +420,8 @@ public class PlayerController : MonoBehaviour
         {
             if (Vector3.Dot(groundNormals, transform.forward) < 0)
             {
+                animator.SetBool("isCrouching" , false);
+                animator.SetBool("Prone" , false);
                 return true;
             }
             else
@@ -355,6 +445,7 @@ public class PlayerController : MonoBehaviour
         if (currentMovementState != MovementState.Crouching)
         {
             currentMovementState = MovementState.Crouching;
+            animator.SetBool("isCrouching" , true);
             SetCollider(new Vector3(0, config.crouchColliderCenterY, 0), config.crouchHeight);
             return;
         }
@@ -412,11 +503,17 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void PlayTargetAnimation(string name , bool isInteracting , bool isRootMotion = false)
+    void PlayTargetAnimation(string name, bool isInteracting, bool isRootMotion = false)
     {
         animator.applyRootMotion = isRootMotion;
         animator.SetBool("isInteracting", isInteracting);
         animator.CrossFade(name, 0.2f);
+    }
+    
+    void PlayTargetAnimation(string name , bool isInteracting , bool Overridable ,bool isRootMotion = false)
+    {
+        animator.SetBool("Overridable", Overridable);
+        PlayTargetAnimation(name, isInteracting, isRootMotion);
     }
 
     private void SetCollider(Vector3 center, float height)
@@ -433,9 +530,8 @@ public class PlayerController : MonoBehaviour
     public bool isGrounded(out RaycastHit hit)
     {
         Vector3 origin = transform.TransformPoint(0, config.offset, 0);
-        bool sphereHit = Physics.SphereCast(origin, _collider.radius, Vector3.down, out hit, config.distance, config.groundLayer);
-        bool rayHit = Physics.Raycast(origin, Vector3.down, out hit, config.distance, config.groundLayer);
-        return sphereHit && rayHit;
+        bool sphereHit = Physics.SphereCast(origin, config.radius, Vector3.down, out hit, config.distance, config.groundLayer);
+        return sphereHit;
     }
 
     public float ClampAbs(float value, float min)
@@ -462,6 +558,31 @@ public class PlayerController : MonoBehaviour
             default:
                 return true;
         }
+    }
+
+    // AI Use
+    public void Direction(Vector3 direction)
+    {
+        headDirection.position = animator.GetBoneTransform(HumanBodyBones.Head).position;
+
+        if (direction == Vector3.zero)
+        {
+            return;
+        }
+        
+        Quaternion rotation = Quaternion.LookRotation(direction , Vector3.up);
+        headDirection.rotation = Quaternion.Slerp(headDirection.rotation, rotation, 50 * Time.deltaTime);
+    }
+
+    private void OnDrawGizmos() 
+    {
+        Gizmos.color = _grounded ? Color.green : Color.red;
+        Gizmos.DrawLine(transform.TransformPoint(0 , config.offset , 0) , transform.position + Vector3.down * config.distance);
+    }
+
+    private bool ParamOn(string name)
+    {
+        return animator.GetBool(name);
     }
 
     #endregion

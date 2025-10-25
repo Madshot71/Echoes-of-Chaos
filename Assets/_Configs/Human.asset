@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a8ad9199e54ccb46906b5517004fd3f, type: 3}
+  m_Name: Human
+  m_EditorClassIdentifier: 
+  movementSpeed: 2
+  rotationSpeed: 10
+  crouchSpeed: 2.5
+  sprintSpeed: 7
+  proneSpeed: 1.5
+  fallSpeed: 10
+  antiBump: 0.5
+  jumpForceUp: 5
+  jumpForceForward: 2
+  defaultHeight: 1.8
+  defaultColliderCenterY: 0.95
+  crouchHeight: 1
+  crouchColliderCenterY: 0.5
+  proneHeight: 0.5
+  proneColliderCenterY: 0.25
+  slideForce: 5
+  minSlideAngle: 5
+  maxSlideAngle: 45
+  <sprintStaminaCost>k__BackingField: 10
+  <jumpStaminaCost>k__BackingField: 15
+  <slideStaminaCost>k__BackingField: 20
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 1
+  distance: 1.15
+  offset: 0.74
+  radius: 0.2
+  fallDamageTime: 4
+  animationSmoothSpeed: 3
+  jumpAnimation: Jump
+  sprintJumpAnimation: SprintJump
+  slideAnimation: Slide
+  landAnimation: Land
+  fallAnimation: Fall

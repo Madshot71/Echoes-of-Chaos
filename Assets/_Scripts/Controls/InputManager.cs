@@ -34,6 +34,7 @@ public class InputManager : MonoBehaviour
         Sprint(inputActions.PlayerController.Sprint.IsPressed());
         Slide(inputActions.PlayerController.Slide.IsPressed());
 
+        player.playerCamera.input = inputActions.PlayerController.Camera.ReadValue<Vector2>();
     }
 
     private void SetUp()
@@ -70,5 +71,6 @@ public class InputManager : MonoBehaviour
     {
         player.playerCamera.TogglePov();
     }
+
     
 }

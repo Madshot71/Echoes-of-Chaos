@@ -11,19 +11,19 @@ public class ControllerCamera : MonoBehaviour
     [Require][SerializeField] private CinemachineVirtualCamera first;
     [SerializeField] private bool isFirstPerson = false;
     private Transform playerHead;
-    private Transform follow;
-    private Transform _camera => Camera.main.transform;
+    public Transform follow { get; private set; }
+    private Vector3 rotationEuler;
+    public Vector2 input;
 
     private void OnValidate()
     {
-        if (controller == null)
-            return;
-        follow ??= new GameObject().transform;
         playerHead ??= controller.animator.GetBoneTransform(HumanBodyBones.Head);
     }
 
     private void Awake()
     {
+        if (controller == null)
+            return;
         Init();
     }
 
@@ -35,23 +35,39 @@ public class ControllerCamera : MonoBehaviour
 
     private void Init()
     {
-        first.Follow = playerHead;
-        first.LookAt = playerHead;
-        third.Follow = playerHead;
-        third.LookAt = playerHead;
+        follow ??= new GameObject("follow").transform;
+        follow.parent = transform;
+
+        first.Follow = follow;
+        first.LookAt = follow;
+        third.Follow = follow;
+        third.LookAt = follow;
     }
 
     private void Follow()
     {
         follow.position = playerHead.position;
     }
-    
+
     private void Rotate()
     {
-        Quaternion direction = _camera.transform.rotation;
-        direction.x = 0;
+        input.Normalize();
+        rotationEuler.x += Sensitivity(input.y) * config.rotateSpeed * Time.deltaTime;
+        rotationEuler.y += Sensitivity(input.x) * config.rotateSpeed * Time.deltaTime;
+        Quaternion direction = Quaternion.Euler(rotationEuler);
+        direction.z = 0;
 
-        follow.rotation = Quaternion.Slerp(follow.rotation, direction, config.rotateSpeed * Time.deltaTime);
+        follow.rotation = Quaternion.Slerp(follow.rotation, direction, config.lerpSpeed * Time.deltaTime);
+    }
+
+    private float Sensitivity(float value)
+    {
+        if (Mathf.Abs(value) > config.Sensitivity)
+        {
+            return value;
+        }
+
+        return 0;
     }
 
     public void TogglePov()

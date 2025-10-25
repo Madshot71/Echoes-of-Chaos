@@ -2,17 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class RandomStringAttribute : MonoBehaviour
+public class RandomStringAttribute : PropertyAttribute
 {
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
+    public float Length;
 
-    // Update is called once per frame
-    void Update()
+    public RandomStringAttribute(int Length)
     {
-        
-    }
+        this.Length = Length;
+    } 
+
 }

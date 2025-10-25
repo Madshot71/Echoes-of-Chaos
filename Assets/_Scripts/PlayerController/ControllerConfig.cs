@@ -12,9 +12,7 @@ public class ControllerConfig : ScriptableObject
     public float fallSpeed = 10f;
     public float antiBump = -1f;
 
-    [Header("Animation")]
-    public float animationSmoothSpeed = 3f;
-
+    
     [Header("Jumping")]
     public float jumpForceUp = 5f;
     public float jumpForceForward = 2f;
@@ -36,36 +34,24 @@ public class ControllerConfig : ScriptableObject
     public float minSlideAngle = 5f;
     public float maxSlideAngle = 45f;
 
+    [field: SerializeField] public float sprintStaminaCost { get; private set;} = 10f;
+    [field : SerializeField] public float jumpStaminaCost { get; private set;} = 15f;
+    [field : SerializeField] public float slideStaminaCost { get; private set;} = 20f;    
+
+
     [Header("Ground Check")]
     public LayerMask groundLayer;
     public float distance = 0.3f;
     public float offset = 0.2f;
-    
+    public float radius = 0.2f;
+    public float fallDamageTime = 4f;
+
     [Header("Animations")]
+    public float animationSmoothSpeed = 3f;
     public string jumpAnimation = "Jump";
     public string sprintJumpAnimation = "SprintJump";
     public string slideAnimation = "Slide";
     public string landAnimation = "Land";
     public string fallAnimation = "Fall";
 
-
-    internal bool isJumping(PlayerController controller)
-    {
-        return controller.animator.GetBool("isJumping");
-    }
-
-    internal bool isSliding(PlayerController controller)
-    {
-        return controller.animator.GetBool("isSliding");
-    }
-
-    internal bool isInteracting(PlayerController controller)
-    {
-        return controller.animator.GetBool("isInteracting");
-    }
-    
-    internal bool isCrouching(PlayerController controller)
-    {
-        return controller.currentMovementState == PlayerController.MovementState.Crouching;
-    }
 }

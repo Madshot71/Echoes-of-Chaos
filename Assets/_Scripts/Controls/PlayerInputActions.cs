@@ -79,7 +79,16 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""expectedControlType"": ""Button"",
                     ""processors"": """",
                     ""interactions"": """",
-                    ""initialStateCheck"": false
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Camera"",
+                    ""type"": ""Value"",
+                    ""id"": ""fd92426e-a2eb-4b97-b30c-fc6a6b768715"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -190,6 +199,17 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": ""Mouse+Keyboard"",
                     ""action"": ""Crouch"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""79f4ee75-fd8e-4d95-96f9-02cbfb1c063e"",
+                    ""path"": ""<Mouse>/delta"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Mouse+Keyboard"",
+                    ""action"": ""Camera"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -390,6 +410,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_PlayerController_Sprint = m_PlayerController.FindAction("Sprint", throwIfNotFound: true);
         m_PlayerController_Slide = m_PlayerController.FindAction("Slide", throwIfNotFound: true);
         m_PlayerController_Crouch = m_PlayerController.FindAction("Crouch", throwIfNotFound: true);
+        m_PlayerController_Camera = m_PlayerController.FindAction("Camera", throwIfNotFound: true);
         // Weapon/Gun
         m_WeaponGun = asset.FindActionMap("Weapon/Gun", throwIfNotFound: true);
         m_WeaponGun_Shoot = m_WeaponGun.FindAction("Shoot", throwIfNotFound: true);
@@ -468,6 +489,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_PlayerController_Sprint;
     private readonly InputAction m_PlayerController_Slide;
     private readonly InputAction m_PlayerController_Crouch;
+    private readonly InputAction m_PlayerController_Camera;
     public struct PlayerControllerActions
     {
         private @PlayerInputActions m_Wrapper;
@@ -478,6 +500,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         public InputAction @Sprint => m_Wrapper.m_PlayerController_Sprint;
         public InputAction @Slide => m_Wrapper.m_PlayerController_Slide;
         public InputAction @Crouch => m_Wrapper.m_PlayerController_Crouch;
+        public InputAction @Camera => m_Wrapper.m_PlayerController_Camera;
         public InputActionMap Get() { return m_Wrapper.m_PlayerController; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -505,6 +528,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Crouch.started += instance.OnCrouch;
             @Crouch.performed += instance.OnCrouch;
             @Crouch.canceled += instance.OnCrouch;
+            @Camera.started += instance.OnCamera;
+            @Camera.performed += instance.OnCamera;
+            @Camera.canceled += instance.OnCamera;
         }
 
         private void UnregisterCallbacks(IPlayerControllerActions instance)
@@ -527,6 +553,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Crouch.started -= instance.OnCrouch;
             @Crouch.performed -= instance.OnCrouch;
             @Crouch.canceled -= instance.OnCrouch;
+            @Camera.started -= instance.OnCamera;
+            @Camera.performed -= instance.OnCamera;
+            @Camera.canceled -= instance.OnCamera;
         }
 
         public void RemoveCallbacks(IPlayerControllerActions instance)
@@ -702,6 +731,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         void OnSprint(InputAction.CallbackContext context);
         void OnSlide(InputAction.CallbackContext context);
         void OnCrouch(InputAction.CallbackContext context);
+        void OnCamera(InputAction.CallbackContext context);
     }
     public interface IWeaponGunActions
     {
