@@ -4,21 +4,23 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEditor.Build;
 using UnityEngine;
 using UnityEngine.Pool;
 
 namespace GhostBoy
 {
-
     [DisallowMultipleComponent]
     public class GunScript : Weapon
     {
         [SerializeField] private LayerMask mask;
-        [SerializeField] private GunConfig config;
+        private GunConfig config => _config as GunConfig;
         [SerializeField] private Transform muzzle;
 
         //Shooting
         private float nextShootTime;
+        private float currentReloadTime;
+        private float currentAmmo;
 
         //Pooling && tracking
         private List<Bullet> activeBullets = new List<Bullet>();
@@ -29,10 +31,11 @@ namespace GhostBoy
         NativeArray<RaycastCommand> commands;
         NativeArray<RaycastHit> hits;
 
+        private bool isReloading => currentReloadTime < config.reloadTime;
 
         private void Awake()
         {
-            _config = config;
+            currentAmmo = config.clipSize;
             //Creating the bullet pool
             pool = new ObjectPool<Bullet>(
                 () => Instantiate(config.bullet.Prefab, transform),
@@ -42,10 +45,12 @@ namespace GhostBoy
                     bullet.transform.SetParent(null);
                     bullet.transform.position = muzzle.position;
                     bullet.transform.forward = muzzle.forward;
+                    bullet.gameObject.SetActive(true);
                     activeBullets.Add(bullet);
                 },
                 bullet =>
                 {
+                    bullet.gameObject.SetActive(false);
                     bullet.transform.SetParent(transform);
                     bullet.transform.position = Vector3.zero;
                     bullet.transform.rotation = Quaternion.identity;
@@ -57,60 +62,70 @@ namespace GhostBoy
                 },
                 true, 50, 100
             );
-
-            //Loading the Pool with instances of bullets
-            for (int i = 0; i < config.maxBullets; i++)
-            {
-                var bullet = pool.Get();
-                pool.Release(bullet);
-            }
         }
 
+        private void Update()
+        {
+            //Run job
+            RunJobs();
+            UpdateReloadTIme();
+            Dispose();
+        }
 
         #region Shooting
         internal override void Attack()
         {
-            if (Time.time > nextShootTime)
+            if (Time.time < nextShootTime || isReloading || currentAmmo <= 0)
             {
                 return;
             }
 
             nextShootTime = Time.time + (1 / config.fireRate);
+            Debug.Log("Shoot");
+            currentAmmo--;
 
             StartCoroutine(Shoot());
         }
 
+        private void UpdateReloadTIme()
+        {
+            if(isReloading)
+            {
+                return;
+            }
+            currentReloadTime += Time.deltaTime;
+        }
+
         internal override void Reload()
         {
+            if(isReloading)
+            {
+                return;
+            }
 
+            //Reload
+            currentReloadTime = 0;
         }
 
         IEnumerator Shoot()
         {
             var bullet = pool.Get();
+            bullet.startPos = muzzle.position;
+            bullet.startDirection = muzzle.forward;
 
             yield return null;
             bullet.trail.enabled = true;
             PlayAudio(config.shootSFX);
         }
 
+        internal override float ReloadPrograss()
+        {
+            return config.reloadTime.DivideBy(currentReloadTime);
+        }
         #endregion
 
 
         #region Burst / Jobs
-
-        private void FixedUpdate()
-        {
-            //Run job
-            RunJobs();
-        }
-
-        private void LateUpdate()
-        {
-            //Clean Up at the end 
-            Dispose();
-        }
-
 
         private void RunJobs()
         {
@@ -144,6 +159,8 @@ namespace GhostBoy
             JobHandle job = gunJob.Schedule(activeBullets.Count, 16);
             job.Complete();
 
+            bullets = gunJob.bullets;
+
             //Update positions
             UpdatePositions();
             RayCasts();
@@ -174,6 +191,7 @@ namespace GhostBoy
             }
 
             commands = new NativeArray<RaycastCommand>(activeBullets.Count * 2, Allocator.TempJob);
+            hits = new NativeArray<RaycastHit>(activeBullets.Count * 2 , Allocator.TempJob);
             JobHandle job = RaycastCommand.ScheduleBatch(commands, hits, 4);
             job.Complete();
 
@@ -192,6 +210,7 @@ namespace GhostBoy
 
                 if (CheckHit(hit1))
                 {
+                    Debug.Log(hit1.collider);
                     if (hit1.collider.TryGetComponent<HitBox>(out HitBox hitbox))
                     {
                         hitbox.TakeDamage(config.bullet.Damage);
@@ -202,6 +221,7 @@ namespace GhostBoy
 
                 if (CheckHit(hit2))
                 {
+                    Debug.Log(hit2.collider);
                     if (hit2.collider.TryGetComponent<HitBox>(out HitBox hitbox))
                     {
                         hitbox.TakeDamage(config.bullet.Damage);
@@ -227,7 +247,6 @@ namespace GhostBoy
 
             return true;
         }
-
 
         private void Dispose()
         {

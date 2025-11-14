@@ -9,9 +9,8 @@ public abstract class Weapon : MonoBehaviour
     public Rigidbody rb { get; private set; }
     public AudioSource audioSource { get; private set; }
     public WeaponInteract weaponInteract { get; private set; }
-    public WeaponConfig _config { get; protected set; }
+    [field : SerializeField] public WeaponConfig _config { get; protected set; }
     [field: SerializeField] public Transform LeftHandIK { get; protected set; }
-    public float reloadProgress { get; private set; }
     public WeaponType weaponType;
 
     internal abstract void Attack();
@@ -38,10 +37,7 @@ public abstract class Weapon : MonoBehaviour
 
     }
 
-    internal virtual float ReloadPrograss()
-    {
-        return reloadProgress.DivideBy(_config.reloadTime);
-    }
+    internal abstract float ReloadPrograss();
 
     public enum WeaponType
     {
