@@ -31,8 +31,13 @@ public class WeaponInteract : Interactable
 
     public override void Interact(CharacterBase character)
     {
-        character.controller.weaponSystem.Equip(weapon);
-        this.enabled = false;
+        character.controller.weaponSystem.EquipWeapon(weapon);
+        canInteract = false;
+    }
+
+    public override void StopInteract(CharacterBase character)
+    {
+        
     }
 
     public void Drop()

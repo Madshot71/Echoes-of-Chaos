@@ -38,9 +38,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": ""View"",
-                    ""type"": ""Value"",
+                    ""type"": ""Button"",
                     ""id"": ""bf64f29d-58af-4af5-ac24-2b2fbd1ff5ef"",
-                    ""expectedControlType"": ""Vector2"",
+                    ""expectedControlType"": ""Button"",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
@@ -89,6 +89,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Interact"",
+                    ""type"": ""Button"",
+                    ""id"": ""0a4a048e-97cd-4c54-bd10-bb1e40363075"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -150,7 +159,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""cd7cc1e6-5063-46f2-9fe7-48f087d22015"",
-                    ""path"": ""<Mouse>/delta"",
+                    ""path"": ""<Keyboard>/f2"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": ""Mouse+Keyboard"",
@@ -212,6 +221,17 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""Camera"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""95210eb6-922c-44d7-af8a-4ecb4b599dcc"",
+                    ""path"": ""<Keyboard>/f"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Mouse+Keyboard"",
+                    ""action"": ""Interact"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         },
@@ -259,6 +279,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""name"": ""Aim"",
                     ""type"": ""Button"",
                     ""id"": ""cb02be67-666e-4d61-98d9-ac27b9165b33"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Holster"",
+                    ""type"": ""Button"",
+                    ""id"": ""4523ca50-45b5-4f18-b1bb-1e7d11933527"",
                     ""expectedControlType"": ""Button"",
                     ""processors"": """",
                     ""interactions"": """",
@@ -318,6 +347,17 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": ""Mouse+Keyboard"",
                     ""action"": ""Aim"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d296bae2-7132-49cd-a4c6-361c5feb08bc"",
+                    ""path"": ""<Keyboard>/h"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Holster"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -411,6 +451,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_PlayerController_Slide = m_PlayerController.FindAction("Slide", throwIfNotFound: true);
         m_PlayerController_Crouch = m_PlayerController.FindAction("Crouch", throwIfNotFound: true);
         m_PlayerController_Camera = m_PlayerController.FindAction("Camera", throwIfNotFound: true);
+        m_PlayerController_Interact = m_PlayerController.FindAction("Interact", throwIfNotFound: true);
         // Weapon/Gun
         m_WeaponGun = asset.FindActionMap("Weapon/Gun", throwIfNotFound: true);
         m_WeaponGun_Shoot = m_WeaponGun.FindAction("Shoot", throwIfNotFound: true);
@@ -418,6 +459,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_WeaponGun_Switch = m_WeaponGun.FindAction("Switch", throwIfNotFound: true);
         m_WeaponGun_MeleeThrow = m_WeaponGun.FindAction("Melee/Throw", throwIfNotFound: true);
         m_WeaponGun_Aim = m_WeaponGun.FindAction("Aim", throwIfNotFound: true);
+        m_WeaponGun_Holster = m_WeaponGun.FindAction("Holster", throwIfNotFound: true);
         // Vehicle/Ship
         m_VehicleShip = asset.FindActionMap("Vehicle/Ship", throwIfNotFound: true);
         m_VehicleShip_Pitch = m_VehicleShip.FindAction("Pitch", throwIfNotFound: true);
@@ -490,6 +532,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_PlayerController_Slide;
     private readonly InputAction m_PlayerController_Crouch;
     private readonly InputAction m_PlayerController_Camera;
+    private readonly InputAction m_PlayerController_Interact;
     public struct PlayerControllerActions
     {
         private @PlayerInputActions m_Wrapper;
@@ -501,6 +544,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         public InputAction @Slide => m_Wrapper.m_PlayerController_Slide;
         public InputAction @Crouch => m_Wrapper.m_PlayerController_Crouch;
         public InputAction @Camera => m_Wrapper.m_PlayerController_Camera;
+        public InputAction @Interact => m_Wrapper.m_PlayerController_Interact;
         public InputActionMap Get() { return m_Wrapper.m_PlayerController; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -531,6 +575,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Camera.started += instance.OnCamera;
             @Camera.performed += instance.OnCamera;
             @Camera.canceled += instance.OnCamera;
+            @Interact.started += instance.OnInteract;
+            @Interact.performed += instance.OnInteract;
+            @Interact.canceled += instance.OnInteract;
         }
 
         private void UnregisterCallbacks(IPlayerControllerActions instance)
@@ -556,6 +603,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Camera.started -= instance.OnCamera;
             @Camera.performed -= instance.OnCamera;
             @Camera.canceled -= instance.OnCamera;
+            @Interact.started -= instance.OnInteract;
+            @Interact.performed -= instance.OnInteract;
+            @Interact.canceled -= instance.OnInteract;
         }
 
         public void RemoveCallbacks(IPlayerControllerActions instance)
@@ -582,6 +632,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_WeaponGun_Switch;
     private readonly InputAction m_WeaponGun_MeleeThrow;
     private readonly InputAction m_WeaponGun_Aim;
+    private readonly InputAction m_WeaponGun_Holster;
     public struct WeaponGunActions
     {
         private @PlayerInputActions m_Wrapper;
@@ -591,6 +642,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         public InputAction @Switch => m_Wrapper.m_WeaponGun_Switch;
         public InputAction @MeleeThrow => m_Wrapper.m_WeaponGun_MeleeThrow;
         public InputAction @Aim => m_Wrapper.m_WeaponGun_Aim;
+        public InputAction @Holster => m_Wrapper.m_WeaponGun_Holster;
         public InputActionMap Get() { return m_Wrapper.m_WeaponGun; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -615,6 +667,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Aim.started += instance.OnAim;
             @Aim.performed += instance.OnAim;
             @Aim.canceled += instance.OnAim;
+            @Holster.started += instance.OnHolster;
+            @Holster.performed += instance.OnHolster;
+            @Holster.canceled += instance.OnHolster;
         }
 
         private void UnregisterCallbacks(IWeaponGunActions instance)
@@ -634,6 +689,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Aim.started -= instance.OnAim;
             @Aim.performed -= instance.OnAim;
             @Aim.canceled -= instance.OnAim;
+            @Holster.started -= instance.OnHolster;
+            @Holster.performed -= instance.OnHolster;
+            @Holster.canceled -= instance.OnHolster;
         }
 
         public void RemoveCallbacks(IWeaponGunActions instance)
@@ -732,6 +790,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         void OnSlide(InputAction.CallbackContext context);
         void OnCrouch(InputAction.CallbackContext context);
         void OnCamera(InputAction.CallbackContext context);
+        void OnInteract(InputAction.CallbackContext context);
     }
     public interface IWeaponGunActions
     {
@@ -740,6 +799,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         void OnSwitch(InputAction.CallbackContext context);
         void OnMeleeThrow(InputAction.CallbackContext context);
         void OnAim(InputAction.CallbackContext context);
+        void OnHolster(InputAction.CallbackContext context);
     }
     public interface IVehicleShipActions
     {

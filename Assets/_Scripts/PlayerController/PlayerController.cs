@@ -21,27 +21,38 @@ public class PlayerController : MonoBehaviour
     public WeaponSystem weaponSystem { get; private set; }
     public StaminaHandler staminaHandler { get; private set; }
     public CharacterBase _characterBase { get; private set; }
-    public Rigidbody _rigidbody { get; private set; }
-    public Animator animator { get; private set; }
+    public InteractionHandler interact { get; private set; }
+
     public InputReceiver receiver;
     public MovementState currentMovementState;
+
+
+    //Required Components
+    public Rigidbody _rigidbody { get; private set; }
+    public Animator animator { get; private set; }
+    
 
     //private
     private Vector3 groundNormals;
     private CapsuleCollider _collider;
-    private Transform _camera => camController ? camController.follow : headDirection;
+    public Transform _camera { get; protected set; }
 
+
+    private float currentTurnRateDegrees;
+    private float previousYAngle;
     private float airTime;
 
-    private const string 
-    CrouchParam  = "isCrouching",
+    private const string
+    CrouchParam = "isCrouching",
     ProneParam = "isProne",
-    InteractParam ="isInteracting",
-    JumpParam = "isJumping"; 
+    InteractParam = "isInteracting",
+    JumpParam = "isJumping",
+    SlideParam = "isSliding",
+    TurnParam = "Rotation";
 
 
     // For AI use
-    private Transform headDirection;
+    
 
     public enum MovementState
     {
@@ -58,6 +69,7 @@ public class PlayerController : MonoBehaviour
         _collider ??= GetComponent<CapsuleCollider>();
         animator ??= GetComponent<Animator>();
         hitBox ??= GetComponent<HitBox>();
+        interact ??= GetComponent<InteractionHandler>();
         
 
         //Set Collider
@@ -74,13 +86,13 @@ public class PlayerController : MonoBehaviour
         this.weaponSystem ??= weapon;
         this.staminaHandler ??= stamina;
 
-        
-        headDirection ??= new GameObject("AI_Direction").transform;
+        currentMovementState = MovementState.Idle;
+        SetCameraTransform();
     }
 
-    private void Start()
+    public virtual void SetCameraTransform()
     {
-        currentMovementState = MovementState.Idle;
+        _camera = Camera.main.transform;
     }
 
     private void Update()
@@ -93,7 +105,7 @@ public class PlayerController : MonoBehaviour
         HandleFallingAndLanding();
 
         //Actions
-        JumpAction(); 
+        JumpAction();
         SlideAction();
         CrouchToggle();
         ProneToggle();
@@ -105,6 +117,7 @@ public class PlayerController : MonoBehaviour
         {
             return;
         }
+
         //Physics
         Movement();
         Rotate();
@@ -112,24 +125,20 @@ public class PlayerController : MonoBehaviour
 
     private void LateUpdate()
     {
-        CheckBase();
         Animate();
-    }
 
-
-    public void Init(CharacterBase _base)
-    {
-        _characterBase = _base;
-    }
-
-    private void CheckBase()
-    {
         if (_characterBase == null) return;
 
         if (_characterBase.controller != this)
         {
             _characterBase = null;
         }
+    }
+
+
+    public void Init(CharacterBase _base)
+    {
+        _characterBase = _base;
     }
 
     private void ResetMovementState()
@@ -154,12 +163,6 @@ public class PlayerController : MonoBehaviour
         //check if were sprinting
         float speed = 0;
 
-        if (receiver.movementInput != Vector2.zero)
-        {
-            speed = config.movementSpeed;
-            currentMovementState = MovementState.Walking;
-        }
-
         if (currentMovementState == MovementState.Crouching)
         {
             speed = config.crouchSpeed;
@@ -168,16 +171,21 @@ public class PlayerController : MonoBehaviour
         {
             speed = config.proneSpeed;
         }
-        else if (receiver.sprintInput && canSprint() && receiver.movementInput.y > 0)
+        else if (receiver.movementInput != Vector2.zero)
+        {
+            speed = config.movementSpeed;
+            currentMovementState = MovementState.Walking;
+        }
+        else
+        {
+            ResetMovementState();
+        }
+
+        if (receiver.sprintInput && canSprint() && receiver.movementInput.y > 0)
         {
             speed = config.sprintSpeed;
             currentMovementState = MovementState.Sprinting;
-            staminaHandler?.ConsumeStamina(config.sprintStaminaCost * Time.fixedDeltaTime);
-        }
-
-        if(speed == 0)
-        {
-            ResetMovementState();
+            staminaHandler?.ConsumeStamina(config.sprintStaminaCost);
         }
 
         //applying force
@@ -200,6 +208,7 @@ public class PlayerController : MonoBehaviour
         _rigidbody.MoveRotation(rotation);
     }
 
+    
     #endregion
 
     private void Animate()
@@ -208,7 +217,6 @@ public class PlayerController : MonoBehaviour
         float vertical = animator.GetFloat("Vertical");
 
         Vector2 movement = new Vector2(receiver.movementInput.x, receiver.movementInput.y);
-
         horizontal = Mathf.Lerp(horizontal, movement.x, config.animationSmoothSpeed * Time.deltaTime);
 
         if (receiver.sprintInput && canSprint() && movement.y > 0)
@@ -226,28 +234,22 @@ public class PlayerController : MonoBehaviour
 
     private void HandleFallingAndLanding()
     {
-        if(ParamOn(InteractParam))
+        if (ParamOn(JumpParam))
         {
-            if (ParamOn(JumpParam) && isGrounded(out RaycastHit landHit))
-            {
-                animator.SetBool(JumpParam, false);
-                HandleJumpLanding();
-            }
-            else if (airTime > config.fallDamageTime)
-            {
-                //Apply fall Damage
-                hitBox.TakeDamage(5 * (airTime - config.fallDamageTime));
-            }
-            
+            _grounded = false;
+            slope = 0;
+            isLanded = false;
+            groundNormals = Vector3.up;
             return;
         }
-
+        
+        
         if (isGrounded(out RaycastHit hit))
         {
             if (isLanded == false)
             {
                 isLanded = true;
-                PlayTargetAnimation(config.landAnimation, true);
+                HandleLanding();
             }
 
             airTime = 0f;
@@ -260,14 +262,20 @@ public class PlayerController : MonoBehaviour
         airTime += Time.deltaTime;
         slope = 0;
         isLanded = false; 
-        groundNormals = Vector3.zero;
+        groundNormals = Vector3.up;;
         _grounded = false;
         _rigidbody.AddForce(Vector3.down * config.fallSpeed);
         PlayTargetAnimation("Fall", true, false);
     }
 
-    private void HandleJumpLanding()
+    private void HandleLanding()
     {
+        if (airTime > config.fallDamageTime)
+        {
+            //Apply fall Damage
+            hitBox.TakeDamage(5 * (airTime - config.fallDamageTime));
+        }
+
         if (currentMovementState == MovementState.Walking)
         {
             //normal landing
@@ -288,8 +296,30 @@ public class PlayerController : MonoBehaviour
         else
         {
             //idle landing
-            PlayTargetAnimation("Land", true, false);
+            PlayTargetAnimation(config.landAnimation, true, false);
         }
+    }
+
+    private void HandleTurning()
+    {
+        // --- Angular Velocity Handling (NEW METHOD) ---
+        float currentYAngle = transform.eulerAngles.y;
+        // Calculate the change in Y-angle since the last frame
+        float deltaAngle = Mathf.DeltaAngle(previousYAngle, currentYAngle);
+        // Calculate the instantaneous turn rate in degrees per second
+        float instantaneousTurnRate = deltaAngle / Time.fixedDeltaTime;
+        // Smooth the turn rate
+        currentTurnRateDegrees = Mathf.Lerp(
+            currentTurnRateDegrees,
+            instantaneousTurnRate,
+            config.turnSmoothing * Time.fixedDeltaTime
+        );
+        // Update the previous Y-angle for the next frame
+        previousYAngle = currentYAngle;
+        // Normalize for the animator
+        float normalizedAngularVelocity = 0f;
+        if (Mathf.Abs(config.maxTurnRate) > Mathf.Epsilon) { normalizedAngularVelocity = Mathf.Clamp(currentTurnRateDegrees / config.maxTurnRate, -1f, 1f); }
+        animator.SetFloat(TurnParam, normalizedAngularVelocity);   
     }
 
     #region Actions
@@ -311,6 +341,8 @@ public class PlayerController : MonoBehaviour
             }
             return;
         }
+
+        animator.SetBool(JumpParam , true);
 
         if (receiver.sprintInput)
         {
@@ -350,10 +382,10 @@ public class PlayerController : MonoBehaviour
         staminaHandler?.ConsumeStamina(config.jumpStaminaCost * JumpStaminaMulti);
     }
 
-    private bool SlideCompleted = false;
+    private bool SlideCompleted = true;
     private void SlideAction()
     {
-        bool isSliding = animator.GetBool("isSliding");
+        bool isSliding = animator.GetBool(SlideParam);
         bool holdSlide = animator.GetBool("HoldSlide");
 
         // Only allow holding slide if sliding, grounded, sprinting, not crouching, not jumping, and not using root motion
@@ -372,7 +404,7 @@ public class PlayerController : MonoBehaviour
         if (receiver.slideInput && receiver.sprintInput && SlideCompleted == true && !ParamOn(InteractParam) && isSliding == false)
         {
             PlayTargetAnimation(config.slideAnimation, true, false);
-            animator.SetBool("isSliding", true);
+            animator.SetBool(SlideParam, true);
             SlideCompleted = false;
             staminaHandler?.ConsumeStamina(config.slideStaminaCost);
 
@@ -404,7 +436,7 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        if (receiver.sprintInput == false)
+        if (canHoldSlide() == false)
         {
             if (ParamOn(InteractParam) == false)
             {
@@ -420,8 +452,8 @@ public class PlayerController : MonoBehaviour
         {
             if (Vector3.Dot(groundNormals, transform.forward) < 0)
             {
-                animator.SetBool("isCrouching" , false);
-                animator.SetBool("Prone" , false);
+                animator.SetBool(CrouchParam , false);
+                animator.SetBool(ProneParam , false);
                 return true;
             }
             else
@@ -445,7 +477,7 @@ public class PlayerController : MonoBehaviour
         if (currentMovementState != MovementState.Crouching)
         {
             currentMovementState = MovementState.Crouching;
-            animator.SetBool("isCrouching" , true);
+            animator.SetBool(CrouchParam , true);
             SetCollider(new Vector3(0, config.crouchColliderCenterY, 0), config.crouchHeight);
             return;
         }
@@ -454,6 +486,7 @@ public class PlayerController : MonoBehaviour
         {
             currentMovementState = MovementState.Idle;
             SetCollider(new Vector3(0, config.defaultColliderCenterY, 0), config.defaultHeight);
+            animator.SetBool(CrouchParam , true);
         }
     }
 
@@ -467,9 +500,17 @@ public class PlayerController : MonoBehaviour
         //Reset
         receiver.proneInput = false;
 
+        if (Mathf.Abs(slope) > config.maxProneSlope)
+        {
+            animator.SetBool(ProneParam, false);
+            Debug.Log("Prone not allowed : Slope too steep");
+            return;
+        }
+
         if (currentMovementState != MovementState.Prone)
         {
             currentMovementState = MovementState.Prone;
+            animator.SetBool(ProneParam, true);
             SetCollider(new Vector3(0, config.proneColliderCenterY, 0), config.proneHeight);
             return;
         }
@@ -506,7 +547,7 @@ public class PlayerController : MonoBehaviour
     void PlayTargetAnimation(string name, bool isInteracting, bool isRootMotion = false)
     {
         animator.applyRootMotion = isRootMotion;
-        animator.SetBool("isInteracting", isInteracting);
+        animator.SetBool(InteractParam, isInteracting);
         animator.CrossFade(name, 0.2f);
     }
     
@@ -548,6 +589,11 @@ public class PlayerController : MonoBehaviour
 
     private bool canSprint()
     {
+        if(staminaHandler?.canuse == false)
+        {
+            return false;
+        }
+
         switch (currentMovementState)
         {
             case MovementState.Crouching:
@@ -560,19 +606,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // AI Use
-    public void Direction(Vector3 direction)
-    {
-        headDirection.position = animator.GetBoneTransform(HumanBodyBones.Head).position;
-
-        if (direction == Vector3.zero)
-        {
-            return;
-        }
-        
-        Quaternion rotation = Quaternion.LookRotation(direction , Vector3.up);
-        headDirection.rotation = Quaternion.Slerp(headDirection.rotation, rotation, 50 * Time.deltaTime);
-    }
+   
 
     private void OnDrawGizmos() 
     {

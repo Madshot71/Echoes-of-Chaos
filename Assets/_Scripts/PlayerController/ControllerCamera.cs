@@ -9,7 +9,9 @@ public class ControllerCamera : MonoBehaviour
     [Header("Settings")]
     [Require][SerializeField] private CinemachineVirtualCamera third;
     [Require][SerializeField] private CinemachineVirtualCamera first;
+    [Require][SerializeField] private CinemachineVirtualCamera aim;
     [SerializeField] private bool isFirstPerson = false;
+    private bool isAimming = false;
     private Transform playerHead;
     public Transform follow { get; private set; }
     private Vector3 rotationEuler;
@@ -27,6 +29,11 @@ public class ControllerCamera : MonoBehaviour
         Init();
     }
 
+    private void Update()
+    {
+        SetAim();
+    }
+
     private void LateUpdate()
     {
         Follow();
@@ -42,6 +49,8 @@ public class ControllerCamera : MonoBehaviour
         first.LookAt = follow;
         third.Follow = follow;
         third.LookAt = follow;
+        aim.Follow = follow;
+        aim.LookAt = follow;
     }
 
     private void Follow()
@@ -52,14 +61,45 @@ public class ControllerCamera : MonoBehaviour
     private void Rotate()
     {
         input.Normalize();
-        rotationEuler.x += Sensitivity(input.y) * config.rotateSpeed * Time.deltaTime;
-        rotationEuler.y += Sensitivity(input.x) * config.rotateSpeed * Time.deltaTime;
-        Quaternion direction = Quaternion.Euler(rotationEuler);
-        direction.z = 0;
+        rotationEuler.x += Sensitivity(input.y) * config.pitchSpeed * Time.deltaTime;
+        rotationEuler.y += Sensitivity(input.x) * config.yawSpeed * Time.deltaTime;
 
-        follow.rotation = Quaternion.Slerp(follow.rotation, direction, config.lerpSpeed * Time.deltaTime);
+        rotationEuler.x = Mathf.Clamp(rotationEuler.x, config.minPivot, config.maxPivot);
+        rotationEuler.z = 0;
+
+        follow.rotation = Quaternion.Euler(rotationEuler);
     }
 
+
+    public void AimToggle(bool value)
+    {
+        if (controller.weaponSystem == null)
+        {
+            isAimming = false;
+            return;
+        }
+
+        isAimming = value;
+    }
+
+    private void SetAim()
+    {
+        if(controller.weaponSystem == null || controller.weaponSystem.current == null)
+        {
+            return;
+        }
+
+        if (isAimming == false)
+        {
+            aim.Priority = 0;
+        }
+        else
+        {
+            aim.Priority = 11;
+        }
+    }
+
+    
     private float Sensitivity(float value)
     {
         if (Mathf.Abs(value) > config.Sensitivity)
@@ -72,17 +112,19 @@ public class ControllerCamera : MonoBehaviour
 
     public void TogglePov()
     {
-        if(isFirstPerson)
+        if(!isFirstPerson)
         {
             // Switch to third person
             first.Priority = 0;
             third.Priority = 10;
+            isFirstPerson = true;
         }
         else
         {
             // Switch to first person
             first.Priority = 10;
             third.Priority = 0;
+            isFirstPerson = false;
         }
     }
 }

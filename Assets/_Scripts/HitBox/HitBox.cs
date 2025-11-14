@@ -1,13 +1,28 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 public class HitBox : MonoBehaviour
 {
+    [SerializeField] private h_Detectors[] Detedtors = new h_Detectors[15];
+     
     public float currentHealth;
     public float maxHealth = 100f; 
+
+    public UnityEvent OnDeath;
+    private bool isDead = false;
 
     private void Awake()
     {
         currentHealth = maxHealth;
+    }
+
+    private void Update()
+    {
+        if (!isDead && currentHealth <= 0)
+        {
+            isDead = true;
+            OnDeath?.Invoke();
+        }
     }
 
     public void TakeDamage(float damage)

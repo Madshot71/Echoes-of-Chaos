@@ -16,9 +16,9 @@
                 },
                 {
                     "name": "View",
-                    "type": "Value",
+                    "type": "Button",
                     "id": "bf64f29d-58af-4af5-ac24-2b2fbd1ff5ef",
-                    "expectedControlType": "Vector2",
+                    "expectedControlType": "Button",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
@@ -67,6 +67,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "Interact",
+                    "type": "Button",
+                    "id": "0a4a048e-97cd-4c54-bd10-bb1e40363075",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -128,7 +137,7 @@
                 {
                     "name": "",
                     "id": "cd7cc1e6-5063-46f2-9fe7-48f087d22015",
-                    "path": "<Mouse>/delta",
+                    "path": "<Keyboard>/f2",
                     "interactions": "",
                     "processors": "",
                     "groups": "Mouse+Keyboard",
@@ -190,6 +199,17 @@
                     "action": "Camera",
                     "isComposite": false,
                     "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "95210eb6-922c-44d7-af8a-4ecb4b599dcc",
+                    "path": "<Keyboard>/f",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Mouse+Keyboard",
+                    "action": "Interact",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -237,6 +257,15 @@
                     "name": "Aim",
                     "type": "Button",
                     "id": "cb02be67-666e-4d61-98d9-ac27b9165b33",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Holster",
+                    "type": "Button",
+                    "id": "4523ca50-45b5-4f18-b1bb-1e7d11933527",
                     "expectedControlType": "Button",
                     "processors": "",
                     "interactions": "",
@@ -296,6 +325,17 @@
                     "processors": "",
                     "groups": "Mouse+Keyboard",
                     "action": "Aim",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d296bae2-7132-49cd-a4c6-361c5feb08bc",
+                    "path": "<Keyboard>/h",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Holster",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

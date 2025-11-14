@@ -11,6 +11,8 @@ public class ControllerConfig : ScriptableObject
     public float proneSpeed = 1.5f;
     public float fallSpeed = 10f;
     public float antiBump = -1f;
+    public float turnSmoothing = 2f;
+    public float maxTurnRate = 5;
 
     
     [Header("Jumping")]
@@ -28,15 +30,17 @@ public class ControllerConfig : ScriptableObject
     [Header("Prone")]
     public float proneHeight = 0.5f;
     public float proneColliderCenterY = 0.25f;
+    public float maxProneSlope = 10;
 
     [Header("Slide")]
     public float slideForce = 5f;
     public float minSlideAngle = 5f;
     public float maxSlideAngle = 45f;
 
+
     [field: SerializeField] public float sprintStaminaCost { get; private set;} = 10f;
     [field : SerializeField] public float jumpStaminaCost { get; private set;} = 15f;
-    [field : SerializeField] public float slideStaminaCost { get; private set;} = 20f;    
+    [field: SerializeField] public float slideStaminaCost { get; private set; } = 20f;    
 
 
     [Header("Ground Check")]

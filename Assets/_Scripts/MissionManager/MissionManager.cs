@@ -1,33 +1,75 @@
-using System;
 using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
 
-public abstract class MissionManager<T> : MonoBehaviour
+namespace GhostBoy.Mission
 {
-        
-}
-
-[System.Serializable]
-public abstract class Mission<T>
-{
-    public T measure;
-    public List<Target<T>> Targets = new List<Target<T>>();
-    protected int index = 0;
-
-    public abstract void Execution();
-
-    protected bool CompareTargets<A>(Func<T, A> selector , T measure)
+    public class MissionManager : MonoBehaviour
     {
-        if (!selector(Targets[index].value).Equals(selector(this.measure)))
-        {
-            return true;
-        }
-        return false;
-    }
-}
+        [SerializeField] private Player player;
+        [SerializeField] public List<Mission> Missions = new List<Mission>();
+        private int index;
 
-public class Target<T>
-{
-    public T value;
+        public UnityEvent OnStart;
+        public UnityEvent OnComplete;
+
+
+        private bool begin;
+        private bool Completed;
+
+        private void Awake()
+        {
+            foreach (var item in Missions)
+            {
+                if (item != null)
+                {
+                    item.character = player;
+                }
+            }
+        }
+        
+        private void Start()
+        {
+            Begin();
+        }
+
+        private void LateUpdate()
+        {
+            if (begin == false)
+            {
+                return;
+            }
+
+            if (Missions[index].isDone)
+            {
+                index++;
+
+                if (index >= Missions.Count)
+                {
+                    Complete();
+                }
+                return;
+            }
+            
+            //StartMission
+            if (Missions[index].started == false)
+            {
+                Missions[index].StartMission();
+            }
+
+        }
+        
+        private void Complete()
+        {
+            OnComplete?.Invoke();
+            begin = false;
+        }
+
+        public void Begin()
+        {
+            OnStart?.Invoke();
+            begin = true;
+        }
+    }
 }

@@ -17,4 +17,23 @@ public static class Vector3Extension
             .OrderBy(v => Vector3.Distance(selector(v), target))
             .First();
     }
+    public static float DivideBy(this float value, float by)
+    {
+        if (value == 0 || by == 0)
+        {
+            return 0;
+        }
+
+        return value / by;
+    }
+    
+    public static float DivideBy(this int value, int by)
+    {
+        if (value == 0 || by == 0)
+        {
+            return 0;
+        }
+
+        return (float)value / (float)by;
+    }
 }
