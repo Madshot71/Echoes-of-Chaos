@@ -11,6 +11,7 @@ public class SceneTransition : MonoBehaviour
     [Header("UI")]
     [SerializeField] private Image loadingBar;
 
+    public Coroutine Loading {get; private set;}
 
     public void Awake()
     {
@@ -26,10 +27,15 @@ public class SceneTransition : MonoBehaviour
 
     public void LoadScene(string name)
     {
-
+        if(Loading != null)
+        {
+            Debug.Log($"Error : Loading process has already began , cant load {name}");
+            return;
+        }
+        Loading = StartCoroutine(Load(name));
     }
 
-    public IEnumerator Load(string name)
+    private IEnumerator Load(string name)
     {
         AsyncOperation load = SceneManager.LoadSceneAsync(name);
 

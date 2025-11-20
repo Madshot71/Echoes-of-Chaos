@@ -259,6 +259,7 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
+
         airTime += Time.deltaTime;
         slope = 0;
         isLanded = false; 
@@ -342,7 +343,14 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
+        PlayJumpAnimaiton();
+    }
+    
+
+    void PlayJumpAnimaiton()
+    {
         animator.SetBool(JumpParam , true);
+        Debug.Log("Jump");
 
         if (receiver.sprintInput)
         {
@@ -352,7 +360,6 @@ public class PlayerController : MonoBehaviour
 
         PlayTargetAnimation(config.jumpAnimation, true, false);
     }
-    
     public void TriggerJumpPhysics()
     {
         float JumpStaminaMulti = 1;

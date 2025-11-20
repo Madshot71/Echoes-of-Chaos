@@ -10,7 +10,8 @@ public abstract class Weapon : MonoBehaviour
     public AudioSource audioSource { get; private set; }
     public WeaponInteract weaponInteract { get; private set; }
     [field : SerializeField] public WeaponConfig _config { get; protected set; }
-    [field: SerializeField] public Transform LeftHandIK { get; protected set; }
+    [field : SerializeField] public Transform LeftHandIK { get; protected set; }
+    [field : SerializeField] public Transform adsPoint {get; protected set;}
     public WeaponType weaponType;
 
     internal abstract void Attack();
@@ -37,8 +38,17 @@ public abstract class Weapon : MonoBehaviour
 
     }
 
-    internal abstract float ReloadPrograss();
+    internal abstract float ReloadProgress();
 
+    protected virtual void PlayAudio(AudioClip clip)
+    {
+        if(clip == null || audioSource == null)
+        {
+            return;
+        }
+        
+        audioSource.PlayOneShot(clip);
+    }
     public enum WeaponType
     {
         Melee,

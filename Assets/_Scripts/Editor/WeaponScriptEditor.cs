@@ -7,14 +7,18 @@ public class WeaponScriptEditor : Editor {
         base.OnInspectorGUI();
         var data = (Weapon)target;
 
-        if (data._config == null)
+        if(!GUILayout.Button("Update Offset"))
         {
             return;
         }
 
-        if(GUILayout.Button("Update Offset"))
+        if (data._config == null)
         {
-            data._config.handOffset = data.transform.localPosition;
+            Debug.LogError($"Error : cant set {data._config} is null");
+            return;
         }
+
+        data._config.leftHandOffset = data._config.leftHandOffset;
+           // data._config.rightHandOffset = data._config.rightHandOffset;
     }
 }

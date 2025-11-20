@@ -7,7 +7,7 @@ public class InputManager : MonoBehaviour
 {
     [SerializeField] private Player player;
     private PlayerInputActions inputActions;
-
+    private PlayerController.InputReceiver receiver = new();
 
     private void Awake()
     {
@@ -34,12 +34,21 @@ public class InputManager : MonoBehaviour
 
     private void Update()
     {
-        Move(inputActions.PlayerController.Movement.ReadValue<Vector2>());
-        Jump(inputActions.PlayerController.Jump.IsPressed());
-        CrouchToggle(inputActions.PlayerController.Crouch.IsPressed());
-        Sprint(inputActions.PlayerController.Sprint.IsPressed());
-        Slide(inputActions.PlayerController.Slide.IsPressed());
+        receiver.movementInput = inputActions.PlayerController.Movement.ReadValue<Vector2>();
+        receiver.jumpInput = inputActions.PlayerController.Jump.IsPressed();
+        receiver.crouchInput = inputActions.PlayerController.Crouch.IsPressed();
+        receiver.sprintInput = inputActions.PlayerController.Sprint.IsPressed();
+        receiver.slideInput = inputActions.PlayerController.Slide.IsPressed();
+
+        if(player != null)
+        {
+            //Passing all
+            player.ControllerInputs(receiver);
+        }
+
         Aim(inputActions.WeaponGun.Aim.IsPressed());
+        Shoot(inputActions.WeaponGun.Shoot.IsPressed());
+
 
         player.playerCamera.input = inputActions.PlayerController.Camera.ReadValue<Vector2>();
         OnWeaponSwitch();
@@ -50,35 +59,9 @@ public class InputManager : MonoBehaviour
         inputActions.PlayerController.View.started += View;
         inputActions.PlayerController.Interact.started += Interact;
 
-        inputActions.WeaponGun.Shoot.performed += Shoot;
         inputActions.WeaponGun.Reload.performed += Reload;
         inputActions.WeaponGun.Switch.performed += ScrollSwitch;
         inputActions.WeaponGun.Holster.started += HolsterToggle;
-    }
-
-    private void Jump(bool value)
-    {
-        player.controller.receiver.jumpInput = value;
-    }
-
-    private void Move(Vector2 input)
-    {
-        player.controller.receiver.movementInput = input;
-    }
-
-    private void CrouchToggle(bool value)
-    {
-        player.controller.receiver.crouchInput = value;
-    }
-
-    private void Sprint(bool value)
-    {
-        player.controller.receiver.sprintInput = value;
-    }
-
-    private void Slide(bool value)
-    {
-        player.controller.receiver.slideInput = value;
     }
 
     private void View(InputAction.CallbackContext context)
@@ -94,11 +77,30 @@ public class InputManager : MonoBehaviour
         }
     }
 
+    private void PeakLeft()
+    {
+        if(player.controller.weaponSystem == null)
+        {
+            return;
+        }
+        player.controller.weaponSystem.peakDirection = -1;
+    }
+
+    private void PeakRight()
+    {
+        if(player.controller.weaponSystem == null)
+        {
+            return;
+        }
+        player.controller.weaponSystem.peakDirection = 1;
+    }
+
 
     #region Weapon Inputs
-    private void Shoot(InputAction.CallbackContext context)
+    private void Shoot(bool value)
     {
-        player.controller.weaponSystem?.Attack();
+        if(value)
+            player.controller.weaponSystem?.Attack();
     }
 
     private void Reload(InputAction.CallbackContext context)

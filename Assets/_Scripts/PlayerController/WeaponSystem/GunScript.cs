@@ -1,12 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEditor.Build;
 using UnityEngine;
 using UnityEngine.Pool;
+using UnityEngine.VFX;
 
 namespace GhostBoy
 {
@@ -18,24 +19,28 @@ namespace GhostBoy
         [SerializeField] private Transform muzzle;
 
         //Shooting
-        private float nextShootTime;
         private float currentReloadTime;
         private float currentAmmo;
+        private float nextShootTime;
 
         //Pooling && tracking
-        private List<Bullet> activeBullets = new List<Bullet>();
+        [SerializeField] private List<Bullet> activeBullets = new List<Bullet>();
         private ObjectPool<Bullet> pool;
+
+        //VFX
+        [SerializeField] private VisualEffect muzzleFlash;
 
         //Jobs
         NativeArray<BulletData> bullets;
-        NativeArray<RaycastCommand> commands;
-        NativeArray<RaycastHit> hits;
+        NativeArray<RaycastCommand> raycasts;
+        NativeArray<RaycastHit> results;
 
         private bool isReloading => currentReloadTime < config.reloadTime;
 
         private void Awake()
         {
             currentAmmo = config.clipSize;
+
             //Creating the bullet pool
             pool = new ObjectPool<Bullet>(
                 () => Instantiate(config.bullet.Prefab, transform),
@@ -45,6 +50,7 @@ namespace GhostBoy
                     bullet.transform.SetParent(null);
                     bullet.transform.position = muzzle.position;
                     bullet.transform.forward = muzzle.forward;
+                    bullet.Init();
                     bullet.gameObject.SetActive(true);
                     activeBullets.Add(bullet);
                 },
@@ -52,8 +58,8 @@ namespace GhostBoy
                 {
                     bullet.gameObject.SetActive(false);
                     bullet.transform.SetParent(transform);
-                    bullet.transform.position = Vector3.zero;
-                    bullet.transform.rotation = Quaternion.identity;
+                    bullet.transform.localPosition = Vector3.zero;
+                    bullet.transform.localRotation = Quaternion.identity;
                     activeBullets.Remove(bullet);
                 },
                 bullet =>
@@ -66,269 +72,252 @@ namespace GhostBoy
 
         private void Update()
         {
-            //Run job
-            RunJobs();
-            UpdateReloadTIme();
-            Dispose();
+            if (isReloading)
+            {
+                currentReloadTime += Time.deltaTime;
+
+                if (currentReloadTime >= config.reloadTime)
+                {
+                    currentAmmo = config.clipSize;
+                }
+            }
         }
 
-        #region Shooting
+        private void FixedUpdate() {
+            Execute();
+        }
+
         internal override void Attack()
         {
-            if (Time.time < nextShootTime || isReloading || currentAmmo <= 0)
+            if(CanShoot() == false)
             {
                 return;
             }
 
             nextShootTime = Time.time + (1 / config.fireRate);
-            Debug.Log("Shoot");
             currentAmmo--;
-
             StartCoroutine(Shoot());
-        }
-
-        private void UpdateReloadTIme()
-        {
-            if(isReloading)
-            {
-                return;
-            }
-            currentReloadTime += Time.deltaTime;
         }
 
         internal override void Reload()
         {
-            if(isReloading)
+            if(isReloading == false)
+                ReloadAmmo();
+        }
+
+        private bool CanShoot()
+        {
+            if(Time.time < nextShootTime)
             {
-                return;
+                return false;
             }
 
-            //Reload
-            currentReloadTime = 0;
-        }
-
-        IEnumerator Shoot()
-        {
-            var bullet = pool.Get();
-            bullet.startPos = muzzle.position;
-            bullet.startDirection = muzzle.forward;
-
-            yield return null;
-            bullet.trail.enabled = true;
-            PlayAudio(config.shootSFX);
-        }
-
-        internal override float ReloadPrograss()
-        {
-            return config.reloadTime.DivideBy(currentReloadTime);
-        }
-        #endregion
-
-
-        #region Burst / Jobs
-
-        private void RunJobs()
-        {
-            if (activeBullets.Count <= 0)
+            if(isReloading) 
             {
-                return;
+                return false;
             }
 
-            bullets = new NativeArray<BulletData>(activeBullets.Count, Allocator.TempJob);
-
-            for (int i = 0; i < activeBullets.Count; i++)
+            if(currentAmmo <= 0)
             {
-                var bullet = activeBullets[i];
-                bullets[i] = new BulletData()
-                {
-                    startPos = bullet.startPos,
-                    direction = bullet.startDirection,
-                    speed = config.bullet.Speed,
-                    gravity = config.bullet.gravity,
-                };
-            }
-
-            GunJobUpdate gunJob = new GunJobUpdate()
-            {
-                time = Time.time,
-                fixedDeltaTime = Time.fixedDeltaTime,
-                bullets = this.bullets
-            };
-
-            //Run job 
-            JobHandle job = gunJob.Schedule(activeBullets.Count, 16);
-            job.Complete();
-
-            bullets = gunJob.bullets;
-
-            //Update positions
-            UpdatePositions();
-            RayCasts();
-            
-        }
-            
-        private void UpdatePositions()
-        {
-            for(int i = 0; i < activeBullets.Count; i++)
-            {
-                activeBullets[i].transform.position = bullets[i].position;
-            }
-        }
-
-        private void RayCasts()
-        {
-            var casts = new RaycastCommand[activeBullets.Count * 2];
-
-            for (int i = 0; i < activeBullets.Count; i++)
-            {
-                var bullet = bullets[i];
-
-                //Check from prev to current position
-                casts[2 * i] = RayCast(bullet.prev_Pos, bullet.position);
-
-                //check from current to next position
-                casts[2* i + 1] = RayCast(bullet.position, bullet.next_Pos);
-            }
-
-            commands = new NativeArray<RaycastCommand>(activeBullets.Count * 2, Allocator.TempJob);
-            hits = new NativeArray<RaycastHit>(activeBullets.Count * 2 , Allocator.TempJob);
-            JobHandle job = RaycastCommand.ScheduleBatch(commands, hits, 4);
-            job.Complete();
-
-            RaycastHits();
-        }
-
-        private void RaycastHits()
-        {
-            for (int i = 0; i < activeBullets.Count; i++)
-            {
-                //2x + 1 = n;
-                int n = 2 * i + 1;
-                int x = i * 2;
-
-                RaycastHit hit1 = hits[x], hit2 = hits[n];
-
-                if (CheckHit(hit1))
-                {
-                    Debug.Log(hit1.collider);
-                    if (hit1.collider.TryGetComponent<HitBox>(out HitBox hitbox))
-                    {
-                        hitbox.TakeDamage(config.bullet.Damage);
-                    }
-                    ReleaseBullet(activeBullets[i]);
-                    continue;
-                }
-
-                if (CheckHit(hit2))
-                {
-                    Debug.Log(hit2.collider);
-                    if (hit2.collider.TryGetComponent<HitBox>(out HitBox hitbox))
-                    {
-                        hitbox.TakeDamage(config.bullet.Damage);
-                    }
-
-                    ReleaseBullet(activeBullets[i]);
-                    continue;
-                }
-            }
-        }
-
-        private void ReleaseBullet(Bullet bullet)
-        {
-            pool.Release(bullet);
-        }
-
-        private bool CheckHit(RaycastHit hit)
-        {
-            if (hit.collider == null)
-            {
+                Reload();
                 return false;
             }
 
             return true;
         }
 
-        private void Dispose()
+        internal override float ReloadProgress()
         {
-            if (activeBullets.Count <= 0)
+            return currentReloadTime.DivideBy(config.reloadTime);
+        }
+        
+        private void ReloadAmmo()
+        {
+            currentReloadTime = 0;
+        }
+        
+        private IEnumerator Shoot()
+        {
+            // Get bullet from pool;
+            var bullet = pool.Get();
+
+            yield return null;
+
+            bullet.Shoot();
+
+            //play Aucio
+            PlayAudio(config.shootSFX);
+
+            //VFX
+            muzzleFlash?.Play();
+        }
+
+        #region Jobs
+
+        private void Execute()
+        {
+            if(activeBullets.Count <= 0)
             {
                 return;
             }
 
-            bullets.Dispose();
-            commands.Dispose();
-            hits.Dispose();
-        }
-        #endregion
+            bullets = new NativeArray<BulletData>(activeBullets.Count , Allocator.TempJob);
 
-        #region Internal Helper Functions
-        
-        private void PlayAudio(AudioClip clip)
-        {
-            if(audioSource != null && clip != null)
+            for (int i = 0; i < activeBullets.Count; i++)
             {
-                audioSource.PlayOneShot(clip);
-            }
-        }
-        private RaycastCommand RayCast(Vector3 position, Vector3 endPoint)
-        {
-            return new RaycastCommand(position, position - endPoint, Vector3.Distance(position, endPoint), mask);
-        }
-        #endregion
-
-
-        [BurstCompile]
-        public struct BulletData
-        {
-            //Time
-            public float currentTime { get; private set; }
-
-            //Position
-            public float3 position { get; private set; }
-            public float3 next_Pos;
-            public float3 prev_Pos;
-
-            //Init
-            public float3 startPos;
-            public float3 direction;
-            public float speed;
-            public float gravity;
-
-
-            public void Update(float time, float fixedDeltaTime)
-            {
-                currentTime = time + fixedDeltaTime;
-                float nextTime = currentTime + fixedDeltaTime;
-                float prevTime = currentTime - fixedDeltaTime;
-
-                position = FindPointOnPorabla(currentTime);
-                next_Pos = FindPointOnPorabla(nextTime);
-
-                if (prevTime > 0)
+                var bullet = activeBullets[i];
+                bullets[i] = new BulletData()
                 {
-                    prev_Pos = FindPointOnPorabla(prevTime);
+                    // Applying data 
+                    currentTime = bullet.currentTime,
+                    startPos = bullet.startPos,
+                    startDir = bullet.startDirection,
+                    startTime = bullet.startTime,
+                    active = bullet.active
+                };
+            }
+
+            var gunjob = new GunScriptJob()
+            {
+                time = Time.time,
+                fixedDeltaTime = Time.fixedDeltaTime,
+                gravity = config.bullet.gravity, 
+                speed = config.bullet.Speed,
+                bullets = this.bullets
+            };
+
+            var job = gunjob.Schedule(activeBullets.Count , 64);
+            job.Complete();
+
+            for (int i = 0; i < activeBullets.Count; i++)
+            {
+               var bullet = activeBullets[i];
+               var data = bullets[i];
+
+               bullet.transform.position = data.position;
+               bullet.currentTime = data.currentTime;
+            }
+
+            RunRaycasts();
+
+            bullets.Dispose();
+        }
+
+
+        private void RunRaycasts()
+        {
+            for (int i = 0; i < bullets.Count(); i++)
+            {
+                var data = bullets[i];
+
+                if(Raycast(data.prevPosition , data.position , out RaycastHit hit))
+                {
+                    CheckHit(hit , i);
+                    continue;
+                }
+                else if(Raycast(data.position , data.nextPosition , out hit))
+                {
+                    CheckHit(hit , i);
+                    continue;
                 }
             }
+        }
 
-            private float3 FindPointOnPorabla(float time)
+        private void CheckHit(RaycastHit hit , int index)
+        {
+            if(hit.collider == null)
             {
-                float3 point = startPos + (direction * speed * time);
-                float3 gravityVec = new float3(0 , -1 ,0) * gravity * time * time;
-                return point + gravityVec;
+                return;
+            }
+
+            //Removing bullet from active list because of hit
+            pool.Release(activeBullets[index]);
+
+            if(hit.collider.TryGetComponent<HitBox>(out HitBox hitbox))
+            {
+                hitbox.TakeDamage(config.bullet.Damage);
             }
         }
 
-        [BurstCompile]
-        public struct GunJobUpdate : IJobParallelFor
+        private bool Raycast(Vector3 position , Vector3 endPoint , out RaycastHit hit)
         {
-            [ReadOnly] public float time;
-            [ReadOnly] public float fixedDeltaTime;
-            public NativeArray<BulletData> bullets;
+            bool rayhit = Physics.Raycast(position , position - endPoint , out hit, Vector3.Distance(position , endPoint) , mask);
+            Debug.DrawLine(position , endPoint , rayhit? Color.green : Color.red);
+            return rayhit;
+        }
 
-            public void Execute(int index)
+        #endregion
+    }
+
+    [BurstCompile]
+    public struct GunScriptJob : IJobParallelFor
+    { 
+        [ReadOnly] public float time;
+        [ReadOnly] public float fixedDeltaTime;
+        [ReadOnly] public float gravity;
+        [ReadOnly] public float speed;
+        [ReadOnly] public float3 down;
+
+        public NativeArray<BulletData> bullets;
+
+        public void Execute(int index)
+        {
+            var bullet = bullets[index];
+            
+            if(bullet.active == false)
             {
-                bullets[index].Update(time, fixedDeltaTime);
+                return;
             }
+
+            if(bullet.startTime < 0)
+            {
+                bullet.startTime = time;
+            }
+
+            bullet.currentTime = time - bullet.startTime;
+            float nextTime = bullet.currentTime + fixedDeltaTime;
+            float prevTime  = bullet.currentTime - fixedDeltaTime;
+
+            //Setting the position in the bullet
+            bullet.position = FindPointOnParabola(bullet.currentTime , bullet);
+            bullet.nextPosition = FindPointOnParabola(nextTime , bullet);
+            
+            if(prevTime > 0)
+            {
+                bullet.prevPosition = FindPointOnParabola(prevTime , bullet);
+            }
+
+            // passing back the values
+            bullets[index] = bullet;
+        }
+
+        private float3 FindPointOnParabola(float _time , BulletData bullet)
+        {
+            down = new float3(0 , -0.001f, 0);
+            float3 point = bullet.startPos + (bullet.startDir * speed * _time);
+            float3 gravityVec = down * gravity * _time * _time;
+            return point + gravityVec;
         }
     }
+
+    [BurstCompile]
+    public struct BulletData
+    {
+        //Time
+        public float currentTime;
+
+        //positions
+        public float3 position;
+        public float3 nextPosition;
+        public float3 prevPosition;
+
+        //Init
+        public float3 startPos;
+        public float3 startDir;
+        public float startTime;
+        public bool active;
+
+    }
+
 }
+

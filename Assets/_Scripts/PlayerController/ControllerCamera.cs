@@ -16,6 +16,7 @@ public class ControllerCamera : MonoBehaviour
     public Transform follow { get; private set; }
     private Vector3 rotationEuler;
     public Vector2 input;
+    public bool sprint;
 
     private void OnValidate()
     {
@@ -70,7 +71,6 @@ public class ControllerCamera : MonoBehaviour
         follow.rotation = Quaternion.Euler(rotationEuler);
     }
 
-
     public void AimToggle(bool value)
     {
         if (controller.weaponSystem == null)
@@ -99,7 +99,6 @@ public class ControllerCamera : MonoBehaviour
         }
     }
 
-    
     private float Sensitivity(float value)
     {
         if (Mathf.Abs(value) > config.Sensitivity)

@@ -12,9 +12,10 @@ public class NPC : CharacterBase
     [SerializeField] private float movementSpeed = 2f;
     [SerializeField] private float maxDistanceWithController = 2f;
     [SerializeField] private float sprintDistance;
+    [SerializeField] private Vector2 movement;
 
     private NavMeshAgent agent;
-    [SerializeField] private Vector2 movement;
+    internal HitBox target;
 
     private void OnValidate()
     {
@@ -99,9 +100,20 @@ public class NPC : CharacterBase
             _controller.receiver.sprintInput = false;
         }
     }
+
     public void Follow(Transform point)
     {
         wayPoint = point;
+    }
+
+    public void Attack(HitBox hitbox)
+    {
+        
+    }
+
+    public void Scan()
+    {
+        
     }
 
 }

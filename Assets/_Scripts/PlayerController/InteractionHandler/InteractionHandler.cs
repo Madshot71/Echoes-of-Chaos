@@ -9,7 +9,6 @@ public class InteractionHandler : MonoBehaviour
 {
     public LayerMask mask;
     public float radius = 3f;
-    [SerializeField] private float distance = 20f;
     public Transform cameraTransform => Camera.main.transform;
     private PlayerController controller;
 

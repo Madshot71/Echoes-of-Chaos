@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -11,6 +13,8 @@ public class CharacterBase : MonoBehaviour
     public PlayerController controller;
     public ControllerCamera playerCamera;
     public Vehicle currentVehicle;
+
+    internal List<CharacterBase> Allies {get; private set;} = new();
     internal Data data;
 
     public Interactable interactable { get; private set; } // the current Interactable 
@@ -46,14 +50,28 @@ public class CharacterBase : MonoBehaviour
         interactable.Interact(this);
     }
 
+
+    public void ControllerInputs(PlayerController.InputReceiver input)
+    {
+        if(controller == null)
+        {
+            return;
+        }   
+        controller.receiver = input;
+    }
     // Data Handling
 
 
     [System.Serializable]
-    internal struct Data
+    public struct Data
     {
         public string name;
         public string ID;
+
+        public float health;
+        public float maxHealth;
+        public float stamina;
+        public float maxStamina;
 
         public bool isPlayer;
         public float3 Position;
@@ -66,8 +84,15 @@ public class CharacterBase : MonoBehaviour
             this.Position = character.position;
             this.Rotation = character.transform.eulerAngles;
 
+            health = controller.hitBox.currentHealth;
+            maxHealth = controller.hitBox.maxHealth;
+
+            stamina = controller.staminaHandler? controller.staminaHandler.current : 1;
+            maxStamina = controller.staminaHandler? controller.staminaHandler.MaxStamina : 1;
+
             this.name = character.name;
             this.ID = character.ID;
+
 
             // Controller Data
         }

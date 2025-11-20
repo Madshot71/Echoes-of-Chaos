@@ -2,23 +2,23 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
+using UnityEngine.Animations.Rigging;
 
 [RequireComponent(typeof(PlayerController) , typeof(AudioSource))]
 public class WeaponSystem : MonoBehaviour
 {
+
+    [SerializeField] public WeaponSystemConfig config;
+    
     /// <summary>
     /// max number of weapons
     /// </summary>
-    private const int max = 3;
+    public const int max = 3;
 
-    /// <summary>
-    /// Current weapon index
-    /// </summary>
-    private int index = 0;
-
+    [Header("Settings")]
+    [SerializeField] private float maxAimDistance;
     [field : SerializeField] public Weapon current {get; private set;}
-    [SerializeField] private Transform HandPoint;
+    [SerializeField] private Transform weaponHolder;
 
 
     [Header("Holsters")]
@@ -28,31 +28,60 @@ public class WeaponSystem : MonoBehaviour
 
     [Header("Audio")]
     [SerializeField] private AudioClip switchClip;
-
     [SerializeField] private int weaponLayer;
     public bool isAimming = false;
 
+    
+    [Header("Rigging")]
+    [SerializeField] public Transform hipPoint;
+    [field : SerializeField] public Transform aimPoint {get; private set;}
+    [SerializeField] private float switchSpeed;
+    private Transform head;
+    private Transform shoulder;
+
     //Required Components
     private PlayerController controller;
-    private Animator animator => controller.animator;
-    private AudioSource audioSource;
+    internal Animator animator => controller.animator;
+    internal AudioSource audioSource {get; private set;}
+    internal Transform _camera {get; private set;}
 
     private bool isSwitchingWeapon;
     private float switchDelay;
     private float next_SwitchTime;
+
+    /// <summary>
+    /// Current weapon index
+    /// </summary>
+    private int index = 0;
+    private WeaponState currentState;
+    public int peakDirection = 0;
 
     private void OnValidate()
     {
         controller ??= GetComponent<PlayerController>();
     }
 
-    #region Actions
+    private void Awake()
+    {
+        _camera ??= Camera.main.transform;
+        head ??= animator.GetBoneTransform(HumanBodyBones.Head);
+        shoulder ??= animator.GetBoneTransform(HumanBodyBones.RightShoulder);
+
+        hipPoint ??= new GameObject("hipPoint").transform;
+        aimPoint ??= new GameObject("aimPoint").transform;
+        hipPoint.parent = animator.GetBoneTransform(HumanBodyBones.RightShoulder);
+        aimPoint.parent = animator.GetBoneTransform(HumanBodyBones.Head);
+    }
+    
     private void Update()
     {
         if (current == null)
         {
+            currentState = null;
             return;
         }
+
+        currentState ??= GetCurrentState(current.weaponType);
     }
 
     private void LateUpdate()
@@ -64,11 +93,80 @@ public class WeaponSystem : MonoBehaviour
             animator.SetLayerWeight(weaponLayer, 0f);
             return;
         }
+
+        UpdateHolder();
+        AimPoint();
+        currentState.UpdateState();
         animator.SetLayerWeight(weaponLayer, 1f);
         Weaponindex(current._config.AnimationIndex);
         SetAim(isAimming);
     }
 
+    #region Animation
+
+    private void OnAnimatorIK(int index)
+    {
+        if(current == null){
+            return;
+        }
+
+        currentState?.OnAnimatorIK();
+    }
+
+    internal void UpdateHand(AvatarIKGoal hand , Transform point)
+    {
+        if(point == null){
+            //Reset
+            animator.SetIKPositionWeight(hand , 0);
+            return;
+        }
+
+        animator.SetIKPosition(hand , point.position);
+        animator.SetIKPositionWeight(hand , 1);
+    }
+
+    internal void UpdateHand(AvatarIKGoal hand , Vector3 point)
+    {
+        if(point == null){
+            //Reset
+            animator.SetIKPositionWeight(hand , 0);
+            return;
+        }
+
+        animator.SetIKPosition(hand , point);
+        animator.SetIKPositionWeight(hand , 1);
+    }
+
+    private void UpdateHolder()
+    {
+        //Applying the rotation using Tran
+        Vector3 position = _camera.position + _camera.forward * maxAimDistance;
+        Vector3 direction = weaponHolder.position - position;
+        weaponHolder.rotation = Quaternion.LookRotation(direction);
+
+        //Applying the position
+        position = isAimming? aimPoint.position : hipPoint.position;
+        weaponHolder.position = Vector3.Lerp(weaponHolder.position , position , switchSpeed * Time.deltaTime); 
+    }
+
+    private void AimPoint()
+    {
+        if(current == null)
+        {
+            return;
+        }
+        //Where the weapons Aim should be
+        Vector3 position = head.position + head.forward * current._config.adsDistance;
+        aimPoint.position = position;
+
+        position = shoulder.position + shoulder.forward * current._config.hipDistance;
+        hipPoint.position = position;
+
+    }
+
+    #endregion
+
+    #region Actions
     public void Attack()
     {
         if (current != null)
@@ -84,7 +182,6 @@ public class WeaponSystem : MonoBehaviour
             current.Reload();
         }
     }
-    
     public void AimToggle(bool value)
     {
         if (current == null)
@@ -95,7 +192,7 @@ public class WeaponSystem : MonoBehaviour
 
         isAimming = value;
     }
-
+    
 
     public void EquipWeapon(Weapon weapon)
     {
@@ -112,7 +209,7 @@ public class WeaponSystem : MonoBehaviour
         weapon.boxCollider.enabled = false;
         current = weapon;
         holster.weapon = weapon;
-        holster.Unholster(HandPoint);
+        holster.Unholster(weaponHolder);
     }
 
 
@@ -123,7 +220,7 @@ public class WeaponSystem : MonoBehaviour
             // If no weapon is equipped, unholster the one at the current index
             if (holsters[index].weapon != null)
             {
-                holsters[index].Unholster(HandPoint);
+                holsters[index].Unholster(weaponHolder);
                 current = holsters[index].weapon;
                 Debug.Log("Weapon Unholstered");
             }
@@ -167,8 +264,6 @@ public class WeaponSystem : MonoBehaviour
             StartCoroutine(SwitchTo(Wrap(index - 1)));
         }
     }
-    #endregion
-
 
     private IEnumerator SwitchTo(int i)
     {
@@ -192,7 +287,7 @@ public class WeaponSystem : MonoBehaviour
 
         PlayAudio(switchClip);
         //UnHolster the weapon we switched to
-        holsters[i].Unholster(HandPoint);
+        holsters[i].Unholster(weaponHolder);
         yield return wait;
 
         // Setting the current weapon to our new weapon
@@ -200,6 +295,8 @@ public class WeaponSystem : MonoBehaviour
         index = i;
         isSwitchingWeapon = false;
     }
+
+    #endregion
 
 
     #region  Internal Helper Fuctions
@@ -226,6 +323,17 @@ public class WeaponSystem : MonoBehaviour
             default:
                 return value;
         }
+    }
+
+    private WeaponState GetCurrentState(Weapon.WeaponType weaponType)
+    {
+        return weaponType switch
+        {
+            Weapon.WeaponType.Gun => new RangeWeaponState(this),
+            Weapon.WeaponType.Melee => throw new NotImplementedException(),
+            Weapon.WeaponType.Bow => throw new NotImplementedException(),
+            _=> throw new NotImplementedException(),
+        };
     }
 
     void PlayAudio(AudioClip clip)
@@ -273,17 +381,16 @@ public class WeaponSystem : MonoBehaviour
             weapon.transform.localRotation = Quaternion.identity;
         }
 
-
         public void Unholster(Transform hand)
         {
             if (weapon.Valid == false || hand == null)
             {
-                Debug.Log($"Cant UnHolster {weapon} , {weapon._config} is null");
+                Debug.Log($"Cant UnHolster {weapon} , {weapon._config} or {hand} is null");
                 return;
             }
 
             weapon.transform.parent = hand;
-            weapon.transform.localPosition = weapon._config.handOffset;
+            weapon.transform.localPosition = weapon._config.leftHandOffset;
             weapon.transform.localRotation = Quaternion.identity;
         }
 

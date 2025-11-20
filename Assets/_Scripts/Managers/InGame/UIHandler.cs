@@ -6,60 +6,59 @@ using TMPro;
 
 public class UIHandler : MonoBehaviour
 {
-    [Require][SerializeField] private CharacterBase character;
-    //Bars
-    [SerializeField] private Image health, health_f, stamina, stamin_f;
+    [Header("Settings")]
+    [SerializeField] private CharacterBase main;
+    [SerializeField] private BarSlot mainsBars;
+    [SerializeField] private List<BarSlot> bars = new();
 
-    //Interaction
     [SerializeField] private TMP_Text interactTxt; 
-
-    [SerializeField] private float lerpSpeed;
+    [SerializeField] public float lerpSpeed{get; private set;}
     
-
+    private void OnValidate()
+    {
+        foreach (var item in bars)
+        {
+            if(item != null)
+                item.Init(this);
+        }
+        mainsBars?.Init(this);
+    }
 
     public void LateUpdate()
     {
-        UI();
-        Interact();
-    }
-
-    public void UI()
-    {
-        float h = character.controller.hitBox.currentHealth;
-        float h_max = character.controller.hitBox.maxHealth;
-
-        Bars(health, health_f, h.DivideBy(h_max));
-        
-
-        if (character.controller.staminaHandler == null)
+        if(main == null)
         {
+            SetInteractTxt(string.Empty);
             return;
         }
-
-        float s = character.controller.staminaHandler.current;
-        float s_max = character.controller.staminaHandler.MaxStamina;
-
-        Bars(stamina, stamin_f, s.DivideBy(s_max)); 
+        Interact(main.interactable);
+        UpdteBars();
     }
-
-
-    private void Bars(Image bar, Image fade, float value)
+    
+    private void UpdteBars()
     {
-        if (bar || fade)
+        for (int i = 0; i < main.Allies.Count; i++)
         {
-            bar.fillAmount = Mathf.Lerp(bar.fillAmount, value, lerpSpeed * Time.deltaTime);
-            fade.fillAmount = Mathf.Lerp(fade.fillAmount, bar.fillAmount, lerpSpeed * Time.deltaTime);
+            bars[i].UI(main.Allies[i].data);
         }
     }
     
-    private void Interact()
+    private void Interact(Interactable interactable)
     {
-        if (character.interactable == null)
-        {
-            interactTxt.text = string.Empty;
+        if (interactable == null){
+            SetInteractTxt(string.Empty);
             return;
         }
+        SetInteractTxt(interactable.InteractionPrompt());
+    }
 
-        interactTxt.text = character.interactable.InteractionPrompt();
+    private void SetInteractTxt(string value)
+    {
+        if(interactTxt == null)
+        {
+            return;
+        }
+        interactTxt.text = value;
     }
 }
+
