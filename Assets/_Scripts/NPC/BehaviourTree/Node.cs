@@ -1,63 +1,142 @@
-using System.Collections.Generic;
-using System.Collections;
-using UnityEngine;
 using System;
+using System.Collections.Generic;
 
 namespace GhostBoy.BehaviourTree
 {
-    public abstract class Node : IProcess
+    public enum Status { Success, Failure, Running }
+
+    public abstract class Node
     {
-        public bool Repeat {get; private set;}
+        public Node parent { get; private set; }
+        protected List<Node> children = new List<Node>();
 
-        public Node parent{get; private set;}
-        public Node[] children;
-        public int currentIndex;
-
-        public enum Status {Success = 0, Failure = -1, Running = 1}
-
-        public Node(Node[] children)
+        public Node()
         {
-            this.children = children;
-            currentIndex = 0;
+            parent = null;
         }
 
-        public virtual Status Process()
+        public Node(List<Node> children)
         {
-            return children[currentIndex].Process();
-        }
-
-        public void Reset()
-        {
-            currentIndex = 0;
-            foreach (var item in children)
+            foreach (Node child in children)
             {
-                item.Reset();
+                Attach(child);
+            }
+        }
+
+        public void Attach(Node node)
+        {
+            node.parent = this;
+            children.Add(node);
+        }
+        
+        public abstract Status Process();
+        
+        public virtual void Reset() { }
+    }
+
+    public class Sequence : Node
+    {
+        private int _currentNodeIndex = 0;
+
+        public Sequence(List<Node> children) : base(children) { }
+
+        public override Status Process()
+        {
+            while (_currentNodeIndex < children.Count)
+            {
+                var childStatus = children[_currentNodeIndex].Process();
+                switch (childStatus)
+                {
+                    case Status.Failure:
+                        Reset();
+                        return Status.Failure;
+                    case Status.Success:
+                        _currentNodeIndex++;
+                        continue;
+                    case Status.Running:
+                        return Status.Running;
+                }
+            }
+            
+            Reset();
+            return Status.Success;
+        }
+
+        public override void Reset()
+        {
+            _currentNodeIndex = 0;
+            foreach (var child in children)
+            {
+                child.Reset();
             }
         }
     }
 
-    public interface IProcess
+    public class Selector : Node
     {
-        Node.Status Process();
-        void Reset(); 
+        private int _currentNodeIndex = 0;
+        
+        public Selector(List<Node> children) : base(children) { }
+
+        public override Status Process()
+        {
+            while (_currentNodeIndex < children.Count)
+            {
+                var childStatus = children[_currentNodeIndex].Process();
+                switch (childStatus)
+                {
+                    case Status.Failure:
+                        _currentNodeIndex++;
+                        continue;
+                    case Status.Success:
+                        Reset();
+                        return Status.Success;
+                    case Status.Running:
+                        return Status.Running;
+                }
+            }
+            
+            Reset();
+            return Status.Failure;
+        }
+
+        public override void Reset()
+        {
+            _currentNodeIndex = 0;
+            foreach (var child in children)
+            {
+                child.Reset();
+            }
+        }
     }
 
-    public class Condition : Node 
+    public class ActionNode : Node
     {
-        public Node _true;
-        public Node _false;
-        Func<bool> _condition;
+        private readonly Func<Status> _action;
 
-        public Condition(Node _true , Node _false , ref Func<bool> condition) : base(new Node[]{_true , _false})
+        public ActionNode(Func<Status> action)
         {
-            this._true = _true;
-            this._false = _false;
-            this._condition = condition;
+            _action = action;
         }
 
         public override Status Process()
         {
-            return _condition()? _true.Process() : _false.Process();
+            return _action();
+        }
+    }
+
+    public class Condition : Node
+    {
+        private readonly Func<bool> _condition;
+
+        public Condition(Func<bool> condition)
+        {
+            _condition = condition;
+        }
+
+        public override Status Process()
+        {
+            return _condition() ? Status.Success : Status.Failure;
         }
     }
 }

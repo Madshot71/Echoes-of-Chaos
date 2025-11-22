@@ -42,12 +42,6 @@ namespace GhostBoy.Mission
 
         public abstract void StartMission();
         public abstract void Execution();
-
-
-        public virtual T Selector<T>(Func<CharacterBase , T> select)
-        {
-            return select(character);
-        }
-
+        
     }
 }

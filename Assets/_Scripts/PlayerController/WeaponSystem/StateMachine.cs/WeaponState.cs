@@ -12,7 +12,15 @@ public abstract class WeaponState
         this.handler = handler;
     }
 
-
+    public virtual void StartState()
+    {
+        Debug.Log($"{this} is Starting");
+    }
     public abstract void UpdateState();
+
+    public virtual void ExitState()
+    {
+        Debug.Log($"{this} is exiting");
+    }
     public abstract void OnAnimatorIK();
 }

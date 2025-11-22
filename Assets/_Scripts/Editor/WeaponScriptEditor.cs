@@ -19,6 +19,6 @@ public class WeaponScriptEditor : Editor {
         }
 
         data._config.leftHandOffset = data._config.leftHandOffset;
-           // data._config.rightHandOffset = data._config.rightHandOffset;
+        data._config.rightHandOffset = data._config.rightHandOffset;
     }
 }

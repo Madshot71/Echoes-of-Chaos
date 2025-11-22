@@ -32,6 +32,9 @@ public class UIHandler : MonoBehaviour
             return;
         }
         Interact(main.interactable);
+
+        //Update All bars
+        mainsBars.UI(main.data);
         UpdteBars();
     }
     

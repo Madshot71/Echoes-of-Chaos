@@ -8,7 +8,7 @@ public class WeaponSystemConfig : ScriptableObject
     [SerializeField] public float ads_camera_offset;
 
     public Vector3 aimPointPosition; 
-    public Vector3 HipPointPosition;
+    public Vector3 hipPointPosition;
 
     [Header("Peak")]
     [SerializeField][Range(0f , 25f)] internal float peakAngle = 15f;

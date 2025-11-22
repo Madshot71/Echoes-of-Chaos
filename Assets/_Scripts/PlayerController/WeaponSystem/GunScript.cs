@@ -203,12 +203,17 @@ namespace GhostBoy
             bullets.Dispose();
         }
 
-
         private void RunRaycasts()
         {
             for (int i = 0; i < bullets.Count(); i++)
             {
                 var data = bullets[i];
+
+                //Release bullet if it reach its max distance
+                if(Vector3.Distance(data.startPos , data.position) > config.bullet.distance)
+                {
+                    ReleaseBullet(activeBullets[i]);
+                }
 
                 if(Raycast(data.prevPosition , data.position , out RaycastHit hit))
                 {
@@ -230,8 +235,9 @@ namespace GhostBoy
                 return;
             }
 
+            Debug.Log($"{hit.collider} hit something");
             //Removing bullet from active list because of hit
-            pool.Release(activeBullets[index]);
+            ReleaseBullet(activeBullets[index]);
 
             if(hit.collider.TryGetComponent<HitBox>(out HitBox hitbox))
             {
@@ -239,11 +245,14 @@ namespace GhostBoy
             }
         }
 
+        private void ReleaseBullet(Bullet bullet)
+        {
+            pool.Release(bullet);
+        }
+
         private bool Raycast(Vector3 position , Vector3 endPoint , out RaycastHit hit)
         {
-            bool rayhit = Physics.Raycast(position , position - endPoint , out hit, Vector3.Distance(position , endPoint) , mask);
-            Debug.DrawLine(position , endPoint , rayhit? Color.green : Color.red);
-            return rayhit;
+            return Physics.Raycast(position , position - endPoint , out hit, Vector3.Distance(position , endPoint) , mask);
         }
 
         #endregion

@@ -38,6 +38,7 @@ public class WeaponSystem : MonoBehaviour
     [SerializeField] private float switchSpeed;
     private Transform head;
     private Transform shoulder;
+    private Transform rightHand;
 
     //Required Components
     private PlayerController controller;
@@ -66,9 +67,14 @@ public class WeaponSystem : MonoBehaviour
         _camera ??= Camera.main.transform;
         head ??= animator.GetBoneTransform(HumanBodyBones.Head);
         shoulder ??= animator.GetBoneTransform(HumanBodyBones.RightShoulder);
+        rightHand ??= animator.GetBoneTransform(HumanBodyBones.RightHand);
 
         hipPoint ??= new GameObject("hipPoint").transform;
         aimPoint ??= new GameObject("aimPoint").transform;
+
+        hipPoint.forward = transform.forward;
+        aimPoint.forward = transform.forward;
+
         hipPoint.parent = animator.GetBoneTransform(HumanBodyBones.RightShoulder);
         aimPoint.parent = animator.GetBoneTransform(HumanBodyBones.Head);
     }
@@ -77,11 +83,19 @@ public class WeaponSystem : MonoBehaviour
     {
         if (current == null)
         {
-            currentState = null;
+            if (currentState != null)
+            {
+                currentState.ExitState();
+                currentState = null;
+            }
             return;
         }
 
-        currentState ??= GetCurrentState(current.weaponType);
+        var requiredState = GetCurrentState(current.weaponType);
+        if (currentState == null || currentState.GetType() != requiredState.GetType())
+        {
+            ChangeState(requiredState);
+        }
     }
 
     private void LateUpdate()
@@ -95,11 +109,20 @@ public class WeaponSystem : MonoBehaviour
         }
 
         UpdateHolder();
-        AimPoint();
-        currentState.UpdateState();
+        SetPoints();
+        currentState?.UpdateState();
         animator.SetLayerWeight(weaponLayer, 1f);
         Weaponindex(current._config.AnimationIndex);
         SetAim(isAimming);
+    }
+
+    private void ChangeState(WeaponState newState)
+    {
+        if(currentState?.GetType() == newState?.GetType()) return;
+        
+        currentState?.ExitState();
+        currentState = newState;
+        currentState?.StartState();
     }
 
     #region Animation
@@ -118,50 +141,44 @@ public class WeaponSystem : MonoBehaviour
         if(point == null){
             //Reset
             animator.SetIKPositionWeight(hand , 0);
+            animator.SetIKRotationWeight(hand , 0);
             return;
         }
 
-        animator.SetIKPosition(hand , point.position);
         animator.SetIKPositionWeight(hand , 1);
+        animator.SetIKRotationWeight(hand , 1);
+        animator.SetIKPosition(hand , point.position);
+        animator.SetIKRotation(hand , point.rotation);
     }
 
     internal void UpdateHand(AvatarIKGoal hand , Vector3 point)
     {
-        if(point == null){
-            //Reset
-            animator.SetIKPositionWeight(hand , 0);
-            return;
-        }
-
-        animator.SetIKPosition(hand , point);
         animator.SetIKPositionWeight(hand , 1);
+        animator.SetIKPosition(hand , point);
+    }
+
+    internal void UpdateHand(AvatarIKGoal hand , Quaternion rotation)
+    {
+        animator.SetIKRotationWeight(hand , 1);
+        animator.SetIKRotation(hand , rotation);
     }
 
     private void UpdateHolder()
     {
-        //Applying the rotation using Tran
-        Vector3 position = _camera.position + _camera.forward * maxAimDistance;
-        Vector3 direction = weaponHolder.position - position;
-        weaponHolder.rotation = Quaternion.LookRotation(direction);
-
-        //Applying the position
-        position = isAimming? aimPoint.position : hipPoint.position;
-        weaponHolder.position = Vector3.Lerp(weaponHolder.position , position , switchSpeed * Time.deltaTime); 
+        weaponHolder.position = rightHand.position;
+        weaponHolder.forward = rightHand.forward;
     }
 
-    private void AimPoint()
+    private void SetPoints()
     {
         if(current == null)
         {
             return;
         }
+        
         //Where the weapons Aim should be
-        Vector3 position = head.position + head.forward * current._config.adsDistance;
-        aimPoint.position = position;
-
-        position = shoulder.position + shoulder.forward * current._config.hipDistance;
-        hipPoint.position = position;
-
+        aimPoint.localPosition = config.aimPointPosition;
+        hipPoint.localPosition = config.hipPointPosition;
     }
 
     #endregion

@@ -19,6 +19,7 @@ public class WeaponSystemEditor : Editor {
         }
 
         data.config.aimPointPosition = data.aimPoint.localPosition;
-        data.config.HipPointPosition = data.hipPoint.localPosition;
+        data.config.hipPointPosition = data.hipPoint.localPosition;
+
     }
 }

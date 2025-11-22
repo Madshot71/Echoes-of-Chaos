@@ -3,16 +3,16 @@ using UnityEngine.XR;
 
 public class RangeWeaponState : WeaponState
 {
-    Transform aimPoint;
     Quaternion _targetRotation;
 
     public RangeWeaponState(WeaponSystem system) : base(system)
     {
-        aimPoint = system.aimPoint;
+    
     }
+
     public override void UpdateState()
     {
-        Peak();
+        //Peak();
     }
 
     public override void OnAnimatorIK()
@@ -29,18 +29,30 @@ public class RangeWeaponState : WeaponState
 
     private void RightHand()
     {
-        if(handler.aimPoint == null)
+        if(handler.hipPoint == null && handler.aimPoint == null)
         {
             return;
         }
 
-        Vector3 aimPos = handler.aimPoint.TransformPoint(current._config.aimDownOffset);
-        Vector3 point = handler.isAimming ? handler.hipPoint.position : aimPos;
+        Vector3 point = Vector3.zero;
+        if(handler.aimPoint != null && handler.isAimming)
+        {
+            point = handler.aimPoint.TransformPoint(current._config.aimDownOffset);
+        }
+        else if(handler.hipPoint != null && handler.isAimming == false)
+        {
+            point = handler.hipPoint.TransformPoint(current._config.hipOffset);
+        }
+
         handler.UpdateHand(AvatarIKGoal.RightHand , point);
     }
 
     private void Peak()
     {
+        if(config == null)
+        {
+            return;
+        }
         Transform bone = animator.GetBoneTransform(HumanBodyBones.Spine);
         
         Quaternion baseRotation = bone.localRotation;

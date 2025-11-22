@@ -27,13 +27,13 @@ public class HitBox : MonoBehaviour
 
     public void TakeDamage(float damage)
     {
-        currentHealth -= damage;
+        currentHealth -= damage * Time.deltaTime;
         if (currentHealth < 0) currentHealth = 0;
     }
 
     public void Heal(float amount)
     {
-        currentHealth += amount;
+        currentHealth += amount * Time.deltaTime;
         if (currentHealth > maxHealth) currentHealth = maxHealth;
     }
 
