@@ -19,8 +19,7 @@ namespace GhostBoy
         [SerializeField] private Transform muzzle;
 
         //Shooting
-        private float currentReloadTime;
-        private float currentAmmo;
+        public float currentReloadTime {get; private set;}
         private float nextShootTime;
 
         //Pooling && tracking
@@ -129,6 +128,11 @@ namespace GhostBoy
         internal override float ReloadProgress()
         {
             return currentReloadTime.DivideBy(config.reloadTime);
+        }
+
+        internal override int MaxAmmo()
+        {
+            return config.maxBullets;
         }
         
         private void ReloadAmmo()
@@ -290,7 +294,8 @@ namespace GhostBoy
             //Setting the position in the bullet
             bullet.position = FindPointOnParabola(bullet.currentTime , bullet);
             bullet.nextPosition = FindPointOnParabola(nextTime , bullet);
-            
+            bullet.prevPosition = bullet.position;
+
             if(prevTime > 0)
             {
                 bullet.prevPosition = FindPointOnParabola(prevTime , bullet);

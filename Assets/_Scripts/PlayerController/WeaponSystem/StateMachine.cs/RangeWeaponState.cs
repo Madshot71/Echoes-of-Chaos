@@ -5,9 +5,13 @@ public class RangeWeaponState : WeaponState
 {
     Quaternion _targetRotation;
 
+    private Transform rightHand;
+    private Transform camera;
+
     public RangeWeaponState(WeaponSystem system) : base(system)
     {
-    
+        rightHand = animator.GetBoneTransform(HumanBodyBones.RightHand);
+        camera = system._camera;
     }
 
     public override void UpdateState()
@@ -24,27 +28,42 @@ public class RangeWeaponState : WeaponState
     private void LeftHand()
     {
         //Update hand to position
-        handler.UpdateHand(AvatarIKGoal.LeftHand , current.LeftHandIK);
-    }
-
-    private void RightHand()
-    {
-        if(handler.hipPoint == null && handler.aimPoint == null)
+        if(current.LeftHandIK == null)
         {
             return;
         }
 
-        Vector3 point = Vector3.zero;
-        if(handler.aimPoint != null && handler.isAimming)
+        handler.UpdateHand(AvatarIKGoal.LeftHand , current.LeftHandIK.position);
+        handler.UpdateHand(AvatarIKGoal.LeftHand , current.LeftHandIK.rotation);
+    }
+
+    private void RightHand()
+    {
+        if(handler.shoulderPoint == null && handler.ironSightAim == null)
         {
-            point = handler.aimPoint.TransformPoint(current._config.aimDownOffset);
-        }
-        else if(handler.hipPoint != null && handler.isAimming == false)
-        {
-            point = handler.hipPoint.TransformPoint(current._config.hipOffset);
+            return;
         }
 
+        if(handler.isAimming == false && handler.attack == false)
+        {
+            handler.SetRightHandAimWeight(0);
+            return;
+        }
+
+        Debug.Log($"Running {this} ");
+
+        Vector3 point = Vector3.zero;
+        if(handler.ironSightAim != null && handler.useIronSight)
+        {
+            point = handler.ironSightAim.TransformPoint(current._config.aimDownOffset);
+        }
+        else if(handler.shoulderPoint != null && handler.useIronSight == false)
+        {
+            point = handler.shoulderPoint.TransformPoint(current._config.hipOffset);
+        }
+        
         handler.UpdateHand(AvatarIKGoal.RightHand , point);
+        handler.SetRightHandAimWeight(1);
     }
 
     private void Peak()

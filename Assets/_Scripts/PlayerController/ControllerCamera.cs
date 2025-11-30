@@ -9,14 +9,19 @@ public class ControllerCamera : MonoBehaviour
     [Header("Settings")]
     [Require][SerializeField] private CinemachineVirtualCamera third;
     [Require][SerializeField] private CinemachineVirtualCamera first;
-    [Require][SerializeField] private CinemachineVirtualCamera aim;
-    [SerializeField] private bool isFirstPerson = false;
+    [Require][SerializeField] private CinemachineVirtualCamera firstAim;
+    [Require][SerializeField] private CinemachineVirtualCamera thirdAim;
+    [SerializeField] private Transform follow ;
+
+    [SerializeField] public bool isFirstPerson {get; private set;}= false;
     private bool isAimming = false;
+    internal bool useFirstAim {get;set;} = false;
     private Transform playerHead;
-    public Transform follow { get; private set; }
+    
     private Vector3 rotationEuler;
     public Vector2 input;
     public bool sprint;
+    private bool lockRotation = false;
 
     private void OnValidate()
     {
@@ -39,6 +44,7 @@ public class ControllerCamera : MonoBehaviour
     {
         Follow();
         Rotate();
+        SetRotations();
     }
 
     private void Init()
@@ -47,11 +53,9 @@ public class ControllerCamera : MonoBehaviour
         follow.parent = transform;
 
         first.Follow = follow;
-        first.LookAt = follow;
         third.Follow = follow;
-        third.LookAt = follow;
-        aim.Follow = follow;
-        aim.LookAt = follow;
+        firstAim.Follow = follow;
+        thirdAim.Follow = follow;
     }
 
     private void Follow()
@@ -61,6 +65,13 @@ public class ControllerCamera : MonoBehaviour
 
     private void Rotate()
     {
+        if(lockRotation)
+        {
+            Quaternion rotation = controller.transform.rotation;
+            follow.rotation = Quaternion.Slerp(follow.rotation , rotation , 40 * Time.deltaTime);
+            return;
+        }
+
         input.Normalize();
         rotationEuler.x += Sensitivity(input.y) * config.pitchSpeed * Time.deltaTime;
         rotationEuler.y += Sensitivity(input.x) * config.yawSpeed * Time.deltaTime;
@@ -69,6 +80,14 @@ public class ControllerCamera : MonoBehaviour
         rotationEuler.z = 0;
 
         follow.rotation = Quaternion.Euler(rotationEuler);
+    }
+
+    private void SetRotations()
+    {
+        first.transform.rotation = follow.rotation;
+        third.transform.rotation = follow.rotation;
+        firstAim.transform.rotation = follow.rotation;
+        thirdAim.transform.rotation = follow.rotation;
     }
 
     public void AimToggle(bool value)
@@ -89,19 +108,41 @@ public class ControllerCamera : MonoBehaviour
             return;
         }
 
-        if (isAimming == false)
+        if(useFirstAim || isFirstPerson)
         {
-            aim.Priority = 0;
+            firstAim.Priority = isAimming ? 11 : 0;
+            thirdAim.Priority = 0;
+            return;
+        }
+
+        thirdAim.Priority = isAimming ? 11 : 0;
+        firstAim.Priority = 0;
+    }
+
+    private void LockCameraRotation(bool value)
+    {
+        lockRotation = value; 
+    }
+
+    public void ToggleAimView()
+    {
+        if(useFirstAim || isAimming == false)
+        {
+            useFirstAim = false;
         }
         else
         {
-            aim.Priority = 11;
+            useFirstAim = true;
         }
     }
 
     private float Sensitivity(float value)
     {
-        if (Mathf.Abs(value) > config.Sensitivity)
+        float sensitivity = isFirstPerson? 
+            isAimming ? config.fp_aim_sensitivity : config.fp_sensitivity :
+            isAimming ? config.tp_aim_sensitivity : config.tp_sensitivity; 
+    
+        if (Mathf.Abs(value) > sensitivity)
         {
             return value;
         }
@@ -111,19 +152,19 @@ public class ControllerCamera : MonoBehaviour
 
     public void TogglePov()
     {
-        if(!isFirstPerson)
+        if(isFirstPerson)
         {
             // Switch to third person
             first.Priority = 0;
             third.Priority = 10;
-            isFirstPerson = true;
+            isFirstPerson = false;
         }
         else
         {
             // Switch to first person
             first.Priority = 10;
             third.Priority = 0;
-            isFirstPerson = false;
+            isFirstPerson = true;
         }
     }
 }

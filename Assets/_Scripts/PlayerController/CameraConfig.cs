@@ -11,4 +11,12 @@ public class CameraConfig : ScriptableObject
     [Header("Clamps")]
     [Range(20f, 45f)] public float maxPivot = 35f;
     [Range(-20f , -45f)] public float minPivot = -35f;    
+
+    [Header("First-Person")]
+    [SerializeField][Range(0f, 1f)] public float fp_sensitivity = 1f;
+    [SerializeField][Range(0f, 1f)] public float fp_aim_sensitivity = 1f;
+
+    [Header("Third-Person")]
+    [SerializeField][Range(0f , 1f)] public float tp_sensitivity = 1f;
+    [SerializeField][Range(0f , 1f)] public float tp_aim_sensitivity = 1f;
 }

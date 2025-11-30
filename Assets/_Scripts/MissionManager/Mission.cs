@@ -11,7 +11,7 @@ namespace GhostBoy.Mission
         public CharacterBase character { get; set; }
 
         [field : SerializeField] public string missionName {get; protected set;}
-        [SerializeField][TextArea(3 , 7)]protected string info;
+        [SerializeField][TextArea(3 , 7)] protected string info;
         public int index { get; protected set; } = 0;
         public bool started { get; protected set; }
         public bool isDone { get; protected set; } = false;
@@ -39,6 +39,7 @@ namespace GhostBoy.Mission
         {
             return info;
         }
+        public abstract float Progress();
 
         public abstract void StartMission();
         public abstract void Execution();

@@ -7,19 +7,29 @@ public class WeaponSystemEditor : Editor {
         base.OnInspectorGUI();
         var data = (WeaponSystem)target;
 
-        if(!GUILayout.Button("Update Config"))
+
+        if(GUILayout.Button("LockToAim"))
         {
-            return;
+            data.LockControlletToAim();
         }
 
-        if(data.config == null)
+        if(GUILayout.Button("LockToShoulder"))
         {
-            Debug.LogError($"Error : Cant set {data.config} is null");
-            return;
+            data.LockControlletToShoulder();
         }
 
-        data.config.aimPointPosition = data.aimPoint.localPosition;
-        data.config.hipPointPosition = data.hipPoint.localPosition;
+        if(GUILayout.Button("UpdateWeapon OffSets - Aim / Shoulder"))
+        {
+            data.UpdateIronSightAimOffset();
+            data.UpdateShoulderAimOffset();
+            data.UpdateWeapon();
+
+        }
+        
+        if(GUILayout.Button("Unlock"))
+        {
+            data.Unlock();
+        }
 
     }
 }

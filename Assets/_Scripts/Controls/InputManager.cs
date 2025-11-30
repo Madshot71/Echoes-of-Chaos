@@ -35,10 +35,9 @@ public class InputManager : MonoBehaviour
     private void Update()
     {
         receiver.movementInput = inputActions.PlayerController.Movement.ReadValue<Vector2>();
-        receiver.jumpInput = inputActions.PlayerController.Jump.IsPressed();
-        receiver.crouchInput = inputActions.PlayerController.Crouch.IsPressed();
+        
         receiver.sprintInput = inputActions.PlayerController.Sprint.IsPressed();
-        receiver.slideInput = inputActions.PlayerController.Slide.IsPressed();
+        
 
         if(player != null)
         {
@@ -48,8 +47,7 @@ public class InputManager : MonoBehaviour
 
         Aim(inputActions.WeaponGun.Aim.IsPressed());
         Shoot(inputActions.WeaponGun.Shoot.IsPressed());
-
-
+        
         player.playerCamera.input = inputActions.PlayerController.Camera.ReadValue<Vector2>();
         OnWeaponSwitch();
     }
@@ -59,9 +57,24 @@ public class InputManager : MonoBehaviour
         inputActions.PlayerController.View.started += View;
         inputActions.PlayerController.Interact.started += Interact;
 
+        //Jump
+        inputActions.PlayerController.Jump.started += i => receiver.jumpInput = true;
+        inputActions.PlayerController.Jump.canceled += i => receiver.jumpInput = false;
+
+        //Slide
+        inputActions.PlayerController.Slide.started += i => receiver.slideInput = true;
+        inputActions.PlayerController.Slide.canceled += i => receiver.slideInput = false;
+
+        //Crouch
+        inputActions.PlayerController.Crouch.started += i => receiver.crouchInput = true;
+        inputActions.PlayerController.Crouch.canceled += i => receiver.crouchInput = false;
+
+
         inputActions.WeaponGun.Reload.performed += Reload;
         inputActions.WeaponGun.Switch.performed += ScrollSwitch;
         inputActions.WeaponGun.Holster.started += HolsterToggle;
+        inputActions.WeaponGun.ToggleAimView.started += ToggleAimView;
+
     }
 
     private void View(InputAction.CallbackContext context)
@@ -95,12 +108,16 @@ public class InputManager : MonoBehaviour
         player.controller.weaponSystem.peakDirection = 1;
     }
 
+    private void ToggleAimView(InputAction.CallbackContext context)
+    {
+        player.playerCamera.ToggleAimView();
+    }
+
 
     #region Weapon Inputs
     private void Shoot(bool value)
     {
-        if(value)
-            player.controller.weaponSystem?.Attack();
+        player.controller.weaponSystem?.Attack(value);
     }
 
     private void Reload(InputAction.CallbackContext context)

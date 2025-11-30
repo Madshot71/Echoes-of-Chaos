@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections;
 using Unity.Mathematics;
 using UnityEngine;
+using GhostBoy;
 
 public class CharacterBase : MonoBehaviour
 {
@@ -28,8 +29,15 @@ public class CharacterBase : MonoBehaviour
     {
         controller?.Init(this);
         playerCamera = controller.camController;
+        data = new Data (this);
     }
 
+    private void Update() 
+    {
+        data.UpdateData(this);
+
+        SetIronSight();
+    }
 
     public void FixedUpdate()
     {
@@ -59,11 +67,26 @@ public class CharacterBase : MonoBehaviour
         }   
         controller.receiver = input;
     }
+
+    #region  WeaponInputs
+
+    public void SetIronSight()
+    {
+        if(controller == null || playerCamera == null)
+        {
+            return;    
+        }
+
+        controller.weaponSystem.useIronSight = playerCamera.isFirstPerson && playerCamera.useFirstAim;
+    }
+
+    #endregion
+
     // Data Handling
 
 
     [System.Serializable]
-    public struct Data
+    public class Data
     {
         public string name;
         public string ID;
@@ -77,27 +100,56 @@ public class CharacterBase : MonoBehaviour
         public float3 Position;
         public float3 Rotation;
 
+        //Weapons 
+        public int currentammo;
+        public int maxAmmo;
+        public float reloadProgress;
 
-        public Data(CharacterBase character , PlayerController controller)
+
+        public Data(CharacterBase character )
+        {
+            UpdateData(character);
+        }
+
+        public void UpdateData(CharacterBase character)
         {
             this.isPlayer = character is Player;
             this.Position = character.position;
             this.Rotation = character.transform.eulerAngles;
 
+            this.name = character.name;
+            this.ID = character.ID;
+
+            var controller = character.controller;
+
+            if(controller == null)
+            {
+                return;
+            }
+
+            SetHealth(controller);
+
+        }
+
+        private void SetHealth(PlayerController controller)
+        {
             health = controller.hitBox.currentHealth;
             maxHealth = controller.hitBox.maxHealth;
 
             stamina = controller.staminaHandler? controller.staminaHandler.current : 1;
-            maxStamina = controller.staminaHandler? controller.staminaHandler.MaxStamina : 1;
-
-            this.name = character.name;
-            this.ID = character.ID;
-
-
-            // Controller Data
+            maxStamina = controller.staminaHandler? controller.staminaHandler.MaxStamina : 1;  
         }
 
-    }
+        private void SetWeaponSystem(PlayerController controller)
+        {
+            if(controller.weaponSystem == null || controller.weaponSystem.current == null)
+            {
+                return;
+            }
+            var currentWeapon = controller.weaponSystem.current;
 
-    
+            currentammo = currentWeapon.currentAmmo;
+            reloadProgress = currentWeapon.ReloadProgress();
+        }
+    }
 }

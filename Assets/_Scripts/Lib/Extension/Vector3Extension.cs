@@ -27,6 +27,12 @@ public static class Vector3Extension
         return value / by;
     }
     
+    /// <summary>
+    /// Warning this version will perform integer division and will trancate the result
+    /// </summary>
+    /// <param name="value"></param>
+    /// <param name="by"></param>
+    /// <returns></returns>
     public static float DivideBy(this int value, int by)
     {
         if (value == 0 || by == 0)
@@ -35,5 +41,22 @@ public static class Vector3Extension
         }
 
         return (float)value / (float)by;
+    }
+}
+
+public class VectorSlide
+{
+    [Range(-1 , 1)]
+    [SerializeField] private float x , y , z;
+
+    public Vector3 value {get
+        {
+            return new Vector3(x , y , z);
+        }
+    }
+
+    public VectorSlide()
+    {
+        
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "ControllerConfig", menuName = "Player/ControllerConfig", order = 0)]
@@ -50,12 +51,24 @@ public class ControllerConfig : ScriptableObject
     public float radius = 0.2f;
     public float fallDamageTime = 4f;
 
+    [Header("Stairs")]
+    [SerializeField] public Vector3 stairsOffset;
+    [SerializeField] public float stairsDistance = 1f;
+    [SerializeField] public float stairsMinSlope = 70f;
+    [SerializeField] public float stairsDownDistance = 0.5f;
+    [SerializeField] public float stairDownOffset = 0.4f;
+
     [Header("Animations")]
     public float animationSmoothSpeed = 3f;
-    public string jumpAnimation = "Jump";
-    public string sprintJumpAnimation = "SprintJump";
+    public TimedAnimation jumpAnimation;
+    public TimedAnimation sprintJumpAnimation;
     public string slideAnimation = "Slide";
-    public string landAnimation = "Land";
+    
     public string fallAnimation = "Fall";
+
+    //Landings
+    public string landAnimation = "Land";
+    public string forwardLandAnimation = "forwardLanding";
+    public string RollLandAnimation = "RollLanding";
 
 }

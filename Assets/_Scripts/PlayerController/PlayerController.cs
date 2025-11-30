@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Net.Http.Headers;
@@ -48,7 +49,8 @@ public class PlayerController : MonoBehaviour
     InteractParam = "isInteracting",
     JumpParam = "isJumping",
     SlideParam = "isSliding",
-    TurnParam = "Rotation";
+    TurnParam = "Rotation",
+    RootMotionParam = "isRootMotion";
 
 
     // For AI use
@@ -70,12 +72,11 @@ public class PlayerController : MonoBehaviour
         animator ??= GetComponent<Animator>();
         hitBox ??= GetComponent<HitBox>();
         interact ??= GetComponent<InteractionHandler>();
-        
 
         //Set Collider
         SetCollider(new Vector3(0, config.defaultColliderCenterY, 0), config.defaultHeight);
-
         _rigidbody.freezeRotation = true;
+        animator.applyRootMotion = false;
     }
 
     private void Awake()
@@ -101,14 +102,9 @@ public class PlayerController : MonoBehaviour
         {
             return;
         }
-
-        HandleFallingAndLanding();
-
-        //Actions
-        JumpAction();
-        SlideAction();
-        CrouchToggle();
-        ProneToggle();
+        
+        HandleTurning();
+        animator.applyRootMotion = animator.GetBool(RootMotionParam);
     }
 
     private void FixedUpdate()
@@ -117,14 +113,21 @@ public class PlayerController : MonoBehaviour
         {
             return;
         }
+        
+        HandleFallingAndLanding();
 
         //Physics
-        Movement();
-        Rotate();
+        if(_grounded && ParamOn(InteractParam) == false)
+        {
+            Movement();
+            Rotate();
+            HandleStairs();
+        }
     }
 
     private void LateUpdate()
     {
+        //Animate
         Animate();
 
         if (_characterBase == null) return;
@@ -133,6 +136,12 @@ public class PlayerController : MonoBehaviour
         {
             _characterBase = null;
         }
+
+        //Actions
+        JumpAction();
+        SlideAction();
+        CrouchToggle();
+        ProneToggle();
     }
 
 
@@ -157,7 +166,6 @@ public class PlayerController : MonoBehaviour
         Vector3 direction = _camera.forward * receiver.movementInput.y + _camera.right * receiver.movementInput.x;
         direction.y = 0;
 
-        direction += Vector3.down * config.antiBump;
         direction.Normalize();
 
         //check if were sprinting
@@ -188,13 +196,22 @@ public class PlayerController : MonoBehaviour
             staminaHandler?.ConsumeStamina(config.sprintStaminaCost);
         }
 
+        //Helps with slope
+        direction = Vector3.ProjectOnPlane(direction , groundNormals);
+
         //applying force
-        _rigidbody.velocity = direction * speed;
+        _rigidbody.velocity = direction * speed + Vector3.down * config.antiBump;
+        
     }
 
     private void Rotate()
     {
-        Vector3 direction = _camera.forward * receiver.movementInput.y + _camera.right * receiver.movementInput.x;
+        Rotate(receiver.movementInput);
+    }
+
+    private void Rotate(Vector2 input)
+    {
+        Vector3 direction = _camera.forward * input.y + _camera.right * input.x;
         direction.y = 0;
         direction.Normalize();
 
@@ -208,6 +225,15 @@ public class PlayerController : MonoBehaviour
         _rigidbody.MoveRotation(rotation);
     }
 
+    public void FaceCameraForward()
+    {
+        Vector3 cameraForward = _camera.forward;
+        cameraForward.y = 0;
+        if (cameraForward.sqrMagnitude < 0.01f) cameraForward = transform.forward;
+        Quaternion targetRotation = Quaternion.LookRotation(cameraForward, Vector3.up);
+        Quaternion playerRotation = Quaternion.Slerp(transform.rotation, targetRotation, config.rotationSpeed * Time.fixedDeltaTime);
+        _rigidbody.MoveRotation(playerRotation);
+    }
     
     #endregion
 
@@ -243,7 +269,6 @@ public class PlayerController : MonoBehaviour
             return;
         }
         
-        
         if (isGrounded(out RaycastHit hit))
         {
             if (isLanded == false)
@@ -259,14 +284,75 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-
-        airTime += Time.deltaTime;
+        airTime += Time.fixedDeltaTime;
         slope = 0;
         isLanded = false; 
-        groundNormals = Vector3.up;;
+        groundNormals = Vector3.up;
         _grounded = false;
-        _rigidbody.AddForce(Vector3.down * config.fallSpeed);
-        PlayTargetAnimation("Fall", true, false);
+        _rigidbody.AddForce(Vector3.down * config.fallSpeed , ForceMode.Acceleration);
+        PlayTargetAnimation(config.fallAnimation, true, false);
+    }
+
+    Coroutine stairLerp;
+    private void HandleStairs()
+    {
+        if(!_grounded && receiver.movementInput == Vector2.zero)
+        {
+            return;
+        }
+        
+        Vector3 direction = Vector3.ProjectOnPlane(transform.forward, groundNormals);
+
+        Vector3 origin = transform.TransformPoint(config.stairsOffset);
+
+        bool rayhit = Physics.Raycast(origin,
+        direction ,
+        out RaycastHit hitforward,
+        config.stairsDistance,
+        config.groundLayer
+        );
+
+        Debug.DrawLine(origin , origin + direction * config.stairsDistance , rayhit? Color.green : Color.red);
+        
+        if(!rayhit)
+        {
+            return;
+        }
+        
+        float slope = Vector3.Angle(hitforward.normal , Vector3.up);
+        
+        if(slope < config.stairsMinSlope)
+        {
+            return;
+        }
+
+        Vector3 downStartPoint = hitforward.point + direction * 0.2f;
+        downStartPoint += hitforward.point + Vector3.up * config.stairDownOffset;
+
+        bool downHit = Physics.Raycast(downStartPoint ,
+        Vector3.down ,
+        out RaycastHit hitDown,
+        config.stairsDownDistance,
+        config.groundLayer);
+
+        Debug.DrawLine(downStartPoint , downStartPoint , downHit? Color.green : Color.red);
+
+        if(downHit && stairLerp == null)
+        {
+            stairLerp = StartCoroutine(MoveTo(new(0 , hitDown.point.y + 0.2f , 0)));
+        }
+    }
+
+    IEnumerator MoveTo(Vector3 position)
+    {
+        WaitForSeconds wait = new WaitForSeconds(0.2f);
+
+        while(Vector3.Distance(transform.position , position) > 0.1f)
+        {
+            Vector3 target = Vector3.Lerp(transform.position , position , 100 * Time.fixedDeltaTime);
+            _rigidbody.MovePosition(target);
+            yield return wait;
+        } 
     }
 
     private void HandleLanding()
@@ -280,18 +366,18 @@ public class PlayerController : MonoBehaviour
         if (currentMovementState == MovementState.Walking)
         {
             //normal landing
-            PlayTargetAnimation("forwardLanding", true, false);
+            PlayTargetAnimation(config.forwardLandAnimation, true, false);
         }
         else if (currentMovementState == MovementState.Sprinting)
         {
             //Sprinting 
             if (airTime > 2f)
             {
-                PlayTargetAnimation("RollLandin", true, false);
+                PlayTargetAnimation(config.RollLandAnimation, true, false);
             }
             else
             {
-                PlayTargetAnimation("forwardLanding", true, false);
+                PlayTargetAnimation(config.forwardLandAnimation, true, false);
             }
         }
         else
@@ -346,39 +432,56 @@ public class PlayerController : MonoBehaviour
         PlayJumpAnimaiton();
     }
     
+    public void TurnAction(float direction)
+    {
+        if(ParamOn(InteractParam))
+        {
+            return;
+        }
+        
+        if(direction > 0)
+        {
+            PlayTargetAnimation("RightTurn" , true , true);
+            return;
+        }
+        PlayTargetAnimation("LeftTurn" , true , true);
+    }
 
     void PlayJumpAnimaiton()
     {
+        if(ParamOn(JumpParam) || ParamOn(InteractParam) || _grounded == false)
+            return;
+        
         animator.SetBool(JumpParam , true);
         Debug.Log("Jump");
 
         if (receiver.sprintInput)
         {
-            PlayTargetAnimation(config.sprintJumpAnimation, true, false);
+            PlayTargetAnimation(config.sprintJumpAnimation, TriggerJumpPhysics, true, false);
             return;
         }
-
-        PlayTargetAnimation(config.jumpAnimation, true, false);
+        PlayTargetAnimation(config.jumpAnimation, TriggerJumpPhysics, true, false);
     }
+    
     public void TriggerJumpPhysics()
     {
+        _rigidbody.useGravity = false;
         float JumpStaminaMulti = 1;
+        Vector3 direction = Vector3.zero;
+
         switch (currentMovementState)
         {
             case MovementState.Idle:
-                _rigidbody.AddForce(transform.up * config.jumpForceUp,
-                    ForceMode.Impulse);
+                direction = transform.up * config.jumpForceUp;
                 break;
 
             case MovementState.Sprinting:
-                _rigidbody.AddForce(transform.up * config.jumpForceUp + transform.forward * config.jumpForceForward,
-                    ForceMode.Impulse);
+                direction = transform.up * config.jumpForceUp + transform.forward * config.jumpForceForward;
                 JumpStaminaMulti = 1.5f;
                 break;
 
             case MovementState.Walking:
-                _rigidbody.AddForce(transform.up * config.jumpForceUp + transform.forward * (config.jumpForceForward / 2),
-                    ForceMode.Impulse);
+                direction = transform.forward * (config.jumpForceForward / 2) + transform.up * config.jumpForceUp;
                 JumpStaminaMulti = 1.2f;
                 break;
 
@@ -387,9 +490,12 @@ public class PlayerController : MonoBehaviour
         }
 
         staminaHandler?.ConsumeStamina(config.jumpStaminaCost * JumpStaminaMulti);
+        _rigidbody.AddForce(direction , ForceMode.Impulse);
+        _rigidbody.useGravity = true;
     }
 
     private bool SlideCompleted = true;
+    private float slideTime = 1;
     private void SlideAction()
     {
         bool isSliding = animator.GetBool(SlideParam);
@@ -418,8 +524,12 @@ public class PlayerController : MonoBehaviour
             // Force crouch collider state during slide
             SetCollider(new Vector3(0, config.crouchColliderCenterY, 0), config.crouchHeight);
         }
+        else
+        {
+            ResetToIdleCollider();
+        }
 
-        animator.SetBool("HoldSlide", canHoldSlide() && receiver.sprintInput);
+        animator.SetBool("HoldSlide", canHoldSlide() && receiver.sprintInput && receiver.slideInput);
 
         // Apply sliding force
         if (isSliding && receiver.slideInput)
@@ -428,13 +538,11 @@ public class PlayerController : MonoBehaviour
             if (slope > config.minSlideAngle && slope < config.maxSlideAngle && holdSlide)
             {
                 // Calculate down slope direction
-                Vector3 downslopeDir = Vector3.ProjectOnPlane(Vector3.down, groundNormals).normalized;
+                Vector3 slideDir = Vector3.ProjectOnPlane(transform.forward, groundNormals).normalized;
+                slideTime += Time.fixedDeltaTime;
 
-                // Blend between down slope and player's forward direction (favoring downslope more as slope gets steeper)
-                float slopeT = Mathf.InverseLerp(config.minSlideAngle, config.maxSlideAngle, slope);
-                Vector3 slideDir = Vector3.Slerp(transform.forward, downslopeDir, slopeT).normalized;
-
-                _rigidbody.AddForce(slideDir * config.slideForce);
+                slideTime = Mathf.Clamp(slideTime , 0 , 3);
+                _rigidbody.AddForce(slideDir * config.slideForce * slideTime);
             }
             else
             {
@@ -443,13 +551,11 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        if (canHoldSlide() == false)
+        if (canHoldSlide() == false && ParamOn(SlideParam) == false)
         {
-            if (ParamOn(InteractParam) == false)
-            {
-                // If not sliding, ensure the capsule collider is reset to normal height
-                ResetToIdleCollider();
-            }
+            // If not sliding, ensure the capsule collider is reset to normal height
+            ResetToIdleCollider();
+            slideTime = 1;
         }
     }
 
@@ -492,8 +598,8 @@ public class PlayerController : MonoBehaviour
         if (CanGetUp())
         {
             currentMovementState = MovementState.Idle;
-            SetCollider(new Vector3(0, config.defaultColliderCenterY, 0), config.defaultHeight);
-            animator.SetBool(CrouchParam , true);
+            ResetToIdleCollider();
+            animator.SetBool(CrouchParam , false);
         }
     }
 
@@ -553,15 +659,28 @@ public class PlayerController : MonoBehaviour
 
     void PlayTargetAnimation(string name, bool isInteracting, bool isRootMotion = false)
     {
-        animator.applyRootMotion = isRootMotion;
+        animator.SetBool(RootMotionParam , isRootMotion);
         animator.SetBool(InteractParam, isInteracting);
         animator.CrossFade(name, 0.2f);
     }
+
+    void PlayTargetAnimation(TimedAnimation animation , Action trigger ,  bool isInteracting , bool isRootMotion)
+    {
+        PlayTargetAnimation(animation.name , isInteracting , isRootMotion);
+        StartCoroutine(PlayTimedAnimation(animation , trigger));
+    } 
     
     void PlayTargetAnimation(string name , bool isInteracting , bool Overridable ,bool isRootMotion = false)
     {
         animator.SetBool("Overridable", Overridable);
         PlayTargetAnimation(name, isInteracting, isRootMotion);
+    }
+
+    IEnumerator PlayTimedAnimation(TimedAnimation animation , Action trigger)
+    {
+        yield return new WaitForSeconds(animation.time);
+        trigger?.Invoke();
+        Debug.Log($"{animation} has been Tiggered");
     }
 
     private void SetCollider(Vector3 center, float height)
@@ -582,6 +701,13 @@ public class PlayerController : MonoBehaviour
         return sphereHit;
     }
 
+
+    /// <summary>
+    /// prevent having extremly low floats in the animator that might cause jittering
+    /// </summary>
+    /// <param name="value"></param>
+    /// <param name="min"></param>
+    /// <returns></returns><summary>
     public float ClampAbs(float value, float min)
     {
         if (Mathf.Abs(value) < min)
@@ -613,7 +739,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-   
 
     private void OnDrawGizmos() 
     {

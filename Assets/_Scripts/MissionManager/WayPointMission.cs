@@ -38,7 +38,7 @@ namespace GhostBoy.Mission
 
         public override string Info()
         {
-            return $"{info} :\n {distance}";
+            return info;
         }
 
         public override bool RunCondition()
@@ -69,6 +69,11 @@ namespace GhostBoy.Mission
                 index++;
             }
 
+        }
+
+        public override float Progress()
+        {
+            return index.DivideBy(Targets.Count);
         }
     }
 }

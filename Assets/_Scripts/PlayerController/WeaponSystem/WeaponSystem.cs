@@ -7,7 +7,6 @@ using UnityEngine.Animations.Rigging;
 [RequireComponent(typeof(PlayerController) , typeof(AudioSource))]
 public class WeaponSystem : MonoBehaviour
 {
-
     [SerializeField] public WeaponSystemConfig config;
     
     /// <summary>
@@ -16,9 +15,10 @@ public class WeaponSystem : MonoBehaviour
     public const int max = 3;
 
     [Header("Settings")]
-    [SerializeField] private float maxAimDistance;
+    [SerializeField] public float maxAimDistance;
     [field : SerializeField] public Weapon current {get; private set;}
     [SerializeField] private Transform weaponHolder;
+    [field : SerializeField] internal Transform aimPoint {get; private set;}
 
 
     [Header("Holsters")]
@@ -29,23 +29,32 @@ public class WeaponSystem : MonoBehaviour
     [Header("Audio")]
     [SerializeField] private AudioClip switchClip;
     [SerializeField] private int weaponLayer;
+    [SerializeField][Range(0 , 1)] private float weight = 0.8f;
     public bool isAimming = false;
 
-    
     [Header("Rigging")]
-    [SerializeField] public Transform hipPoint;
-    [field : SerializeField] public Transform aimPoint {get; private set;}
-    [SerializeField] private float switchSpeed;
+    [SerializeField] public Transform shoulderPoint;
+    [field : SerializeField] public Transform ironSightAim {get; private set;}
+    [SerializeField] public MultiAimConstraint rightHandAim;
+    [SerializeField] public MultiAimConstraint spineAim;
+    [SerializeField] public MultiAimConstraint headAim;
+    [SerializeField] private Direction spineForward;
+
+    internal enum Direction
+    {
+        X , Y , Z , Xn , Yn , Zn
+    }
+
     private Transform head;
     private Transform shoulder;
     private Transform rightHand;
 
     //Required Components
-    private PlayerController controller;
+    internal PlayerController controller {get; private set;}
     internal Animator animator => controller.animator;
     internal AudioSource audioSource {get; private set;}
     internal Transform _camera {get; private set;}
-
+    internal Transform spine;
     private bool isSwitchingWeapon;
     private float switchDelay;
     private float next_SwitchTime;
@@ -56,27 +65,54 @@ public class WeaponSystem : MonoBehaviour
     private int index = 0;
     private WeaponState currentState;
     public int peakDirection = 0;
+    public bool useIronSight = false;
+    public bool attack = false;
+
+    #if UNITY_EDITOR
+    protected bool LockToShoulder {get; private set;} = false;
+    protected bool LockToAim {get ;private set;} = false;
+    protected bool Unlocked {get; private set;} = true;
+
+
+    #endif
 
     private void OnValidate()
     {
         controller ??= GetComponent<PlayerController>();
+
+        _camera = Camera.main.transform;
+
+        shoulderPoint ??= new GameObject("hipPoint").transform;
+        ironSightAim ??= new GameObject("ironSight").transform;
+
+        head ??= animator.GetBoneTransform(HumanBodyBones.Head);
+        shoulder ??= animator.GetBoneTransform(HumanBodyBones.RightShoulder);
+        rightHand ??= animator.GetBoneTransform(HumanBodyBones.RightHand);
+        spine ??= animator.GetBoneTransform(HumanBodyBones.Chest);
+
+        aimPoint ??= new GameObject("AimPoint").transform;
+
+        SetUpRightHandConstrant();
+        SetUpBodyRigConstrant();
     }
 
     private void Awake()
     {
-        _camera ??= Camera.main.transform;
-        head ??= animator.GetBoneTransform(HumanBodyBones.Head);
-        shoulder ??= animator.GetBoneTransform(HumanBodyBones.RightShoulder);
-        rightHand ??= animator.GetBoneTransform(HumanBodyBones.RightHand);
+        //Getting Transforms
+        shoulderPoint.parent = shoulder;
+        ironSightAim.parent = animator.GetBoneTransform(HumanBodyBones.RightEye);
 
-        hipPoint ??= new GameObject("hipPoint").transform;
-        aimPoint ??= new GameObject("aimPoint").transform;
+        shoulderPoint.forward = transform.forward;
+        ironSightAim.forward = transform.forward;
 
-        hipPoint.forward = transform.forward;
-        aimPoint.forward = transform.forward;
+        shoulderPoint.parent = animator.GetBoneTransform(HumanBodyBones.RightShoulder);
+        ironSightAim.parent = animator.GetBoneTransform(HumanBodyBones.Head);
 
-        hipPoint.parent = animator.GetBoneTransform(HumanBodyBones.RightShoulder);
-        aimPoint.parent = animator.GetBoneTransform(HumanBodyBones.Head);
+        aimPoint.parent = _camera;
+        
+        Vector3 position = aimPoint.localPosition;
+        position.z = maxAimDistance;
+        aimPoint.localPosition = position;
     }
     
     private void Update()
@@ -96,6 +132,11 @@ public class WeaponSystem : MonoBehaviour
         {
             ChangeState(requiredState);
         }
+
+        
+        Weaponindex(current._config.AnimationIndex);
+        SetAim(isAimming);
+        //UpdateBody();
     }
 
     private void LateUpdate()
@@ -105,17 +146,20 @@ public class WeaponSystem : MonoBehaviour
             SetAim(false);
             Weaponindex(0);
             animator.SetLayerWeight(weaponLayer, 0f);
+            SetRightHandAimWeight(0);
             return;
         }
 
-        UpdateHolder();
         SetPoints();
-        currentState?.UpdateState();
-        animator.SetLayerWeight(weaponLayer, 1f);
-        Weaponindex(current._config.AnimationIndex);
-        SetAim(isAimming);
-    }
+        animator.SetLayerWeight(weaponLayer, weight);
+        UpdateHolder();
 
+        if (Unlocked)
+        {
+           currentState?.UpdateState(); 
+        }
+    }
+    
     private void ChangeState(WeaponState newState)
     {
         if(currentState?.GetType() == newState?.GetType()) return;
@@ -133,22 +177,12 @@ public class WeaponSystem : MonoBehaviour
             return;
         }
 
-        currentState?.OnAnimatorIK();
-    }
-
-    internal void UpdateHand(AvatarIKGoal hand , Transform point)
-    {
-        if(point == null){
-            //Reset
-            animator.SetIKPositionWeight(hand , 0);
-            animator.SetIKRotationWeight(hand , 0);
+        if(Unlocked)
+        {
+            currentState?.OnAnimatorIK();
             return;
-        }
-
-        animator.SetIKPositionWeight(hand , 1);
-        animator.SetIKRotationWeight(hand , 1);
-        animator.SetIKPosition(hand , point.position);
-        animator.SetIKRotation(hand , point.rotation);
+        }  
+        SetLockedIK();
     }
 
     internal void UpdateHand(AvatarIKGoal hand , Vector3 point)
@@ -160,33 +194,80 @@ public class WeaponSystem : MonoBehaviour
     internal void UpdateHand(AvatarIKGoal hand , Quaternion rotation)
     {
         animator.SetIKRotationWeight(hand , 1);
+        
         animator.SetIKRotation(hand , rotation);
+    }
+
+    internal void SetRightHandAimWeight(float amount)
+    {
+        amount = Mathf.Clamp01(amount);
+
+        rightHandAim.weight = amount;
     }
 
     private void UpdateHolder()
     {
         weaponHolder.position = rightHand.position;
-        weaponHolder.forward = rightHand.forward;
+        weaponHolder.rotation = rightHand.rotation;
+    }
+
+    private void SetUpBodyRigConstrant()
+    {
+        if(spineAim.data.constrainedObject == spine)
+        {
+            return;
+        }
+
+        spineAim.data.sourceObjects.Clear();
+        spineAim.data.sourceObjects.Add(new(spine , 1));
     }
 
     private void SetPoints()
+    {
+        if(config == null)
+            return;
+        
+        if(ironSightAim != null)
+            ironSightAim.localPosition = current._config.hipOffset;
+        
+        if(shoulderPoint != null)
+            shoulderPoint.localPosition = current._config.hipOffset;
+    }
+
+    private void UpdateBody()
     {
         if(current == null)
         {
             return;
         }
-        
-        //Where the weapons Aim should be
-        aimPoint.localPosition = config.aimPointPosition;
-        hipPoint.localPosition = config.hipPointPosition;
+
+        Vector3 rootForward = transform.forward;
+        Vector3 childAim = GetDirection(spine , spineForward);
+
+        Vector3 projectedRootForward = Vector3.ProjectOnPlane(rootForward , Vector3.up);
+        Vector3 projectedChildAim = Vector3.ProjectOnPlane(childAim , Vector3.up);
+
+        float angle = Vector3.SignedAngle(projectedRootForward, projectedChildAim , transform.up);
+       
+        if(Mathf.Abs(angle) < config.maxTurnAngle)
+        {
+            return;
+        }
+        controller.TurnAction(angle);
     }
 
     #endregion
 
     #region Actions
-    public void Attack()
+
+    public void Attack(bool value)
     {
-        if (current != null)
+        if(value == false)
+        {
+            return;
+        }
+        
+        if (current != null && CanShoot())
         {
             current.Attack();
         }
@@ -206,10 +287,8 @@ public class WeaponSystem : MonoBehaviour
             isAimming = false;
             return;
         }
-
         isAimming = value;
     }
-    
 
     public void EquipWeapon(Weapon weapon)
     {
@@ -228,7 +307,6 @@ public class WeaponSystem : MonoBehaviour
         holster.weapon = weapon;
         holster.Unholster(weaponHolder);
     }
-
 
     public void HolsterToggle()
     {
@@ -284,7 +362,7 @@ public class WeaponSystem : MonoBehaviour
 
     private IEnumerator SwitchTo(int i)
     {
-        if (holsters[i].weapon == null || i == index)
+        if (holsters[i].weapon == null)
         {
             Debug.Log($"Cant switch to {index} , no weapon at that point");
             yield break;
@@ -370,6 +448,41 @@ public class WeaponSystem : MonoBehaviour
     private void SetAim(bool value)
     {
         animator?.SetBool("Aim", value);
+
+        if(value)
+            controller.FaceCameraForward();
+    }
+
+    private bool CanShoot()
+    {
+        if(current == null)
+        {
+            return false;
+        }
+
+        Vector3 postion = useIronSight ? ironSightAim.position : shoulderPoint.position;
+        float distance = Vector3.Distance(postion , weaponHolder.position);
+        if(distance < 0.3f)
+        {
+            return true;
+        }
+        else
+        {
+            Debug.Log("Cant Shoot yet");
+            return false;
+        }
+    }
+
+    private void SetUpRightHandConstrant()
+    {
+        if(rightHandAim.data.constrainedObject == rightHand)
+        {
+            return;
+        }
+
+        rightHandAim.data.constrainedObject = rightHand;
+        rightHandAim.data.sourceObjects.Clear();
+        rightHandAim.data.sourceObjects.Add(new WeightedTransform(aimPoint , 1));
     }
     
     private void OnDrawGizmosSelected() {
@@ -381,6 +494,91 @@ public class WeaponSystem : MonoBehaviour
                 Gizmos.DrawCube(item.point.position, size);
         }    
     }
+
+    #if UNITY_EDITOR
+
+    public void UpdateWeapon()
+    {
+        if(config == null)
+        {
+            Debug.LogError($"Error : Cant set {config} is null");
+            return;
+        }
+
+        if(current == null)
+        {
+            return;
+        }
+
+        current.UpdateConfig();
+    }
+
+    public void UpdateIronSightAimOffset()
+    {
+        if(LockToAim)
+            current._config.aimDownOffset = ironSightAim.localPosition;
+    }
+
+    public void UpdateShoulderAimOffset()
+    {
+        if(LockToShoulder)
+            current._config.hipOffset = shoulderPoint.localEulerAngles;
+    }
+
+    public void LockControlletToAim()
+    {
+        LockToAim = true;
+        LockToShoulder = false;
+        Unlocked = false;
+    }
+
+    public void LockControlletToShoulder()
+    {
+        LockToAim = false;
+        LockToShoulder = true;
+        Unlocked = false;
+    }
+
+    public void Unlock()
+    {
+        LockToAim = false;
+        LockToShoulder = false;
+        Unlocked = true;
+        Debug.Log($"{this} Unlocked");
+    }
+
+    private void SetLockedIK()
+    {
+        Vector3 point = Vector3.zero;
+        if(ironSightAim != null && LockToAim)
+        {
+            point = ironSightAim.TransformPoint(current._config.aimDownOffset);
+        }
+        else if(shoulderPoint != null && LockToShoulder)
+        {
+            point = shoulderPoint.TransformPoint(current._config.hipOffset);
+        }
+        
+        UpdateHand(AvatarIKGoal.RightHand , point);
+
+        SetRightHandAimWeight(1);
+    }
+
+    private Vector3 GetDirection(Transform _transform ,Direction _value)
+    {
+        return _value switch
+        {
+            Direction.X => _transform.right,
+            Direction.Y => _transform.up,
+            Direction.Z => _transform.forward,
+            Direction.Xn => _transform.right * -1,
+            Direction.Yn => _transform.up * -1,
+            Direction.Zn => _transform.forward,
+            _=> transform.forward
+        } ;
+    }
+
+    #endif
 
 
     #endregion
@@ -407,8 +605,8 @@ public class WeaponSystem : MonoBehaviour
             }
 
             weapon.transform.parent = hand;
-            weapon.transform.localPosition = weapon._config.leftHandOffset;
-            weapon.transform.localRotation = Quaternion.identity;
+            weapon.transform.localPosition = weapon._config.rightHandOffset;
+            weapon.transform.localRotation = weapon._config.rightHandRotation;
         }
 
         public IEnumerator Drop(Transform hand)
@@ -422,7 +620,5 @@ public class WeaponSystem : MonoBehaviour
             yield return null;
 
         }
-        
     }
-
 }

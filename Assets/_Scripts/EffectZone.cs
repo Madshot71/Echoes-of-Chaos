@@ -10,7 +10,7 @@ public class EffectZone : MonoBehaviour
     List<HitBox> hitboxs = new();
 
 
-    enum ZoneType
+    public enum ZoneType
     {
         Heal,
         Damage
@@ -23,7 +23,7 @@ public class EffectZone : MonoBehaviour
 
     private void OnTriggerEnter(Collider other) {
 
-        if(hitboxs.Exist(i => i.gameObject == other.gameObject))
+        if(hitboxs.Exists (i => i.gameObject == other.gameObject))
         {
             return;
         }
@@ -32,7 +32,6 @@ public class EffectZone : MonoBehaviour
         {
             return;
         }
-
         hitboxs.Add(hitbox);
     }    
 

@@ -24,8 +24,7 @@ namespace GhostBoy.Mission
                 infoTxt.text = mission.Info();
 
             if(bar)
-                bar.fillAmount = mission.index.DivideBy(mission.Count());
+                bar.fillAmount = mission.Progress();
         }
-
     }
 }

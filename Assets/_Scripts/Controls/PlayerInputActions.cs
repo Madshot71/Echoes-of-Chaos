@@ -292,6 +292,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""ToggleAimView"",
+                    ""type"": ""Button"",
+                    ""id"": ""4d6401bb-35ce-42a0-a635-a685aefed09f"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -358,6 +367,17 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""Holster"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""11faf61a-0c00-41bb-9fda-2c2072f63d51"",
+                    ""path"": ""<Mouse>/middleButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Mouse+Keyboard"",
+                    ""action"": ""ToggleAimView"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -460,6 +480,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_WeaponGun_MeleeThrow = m_WeaponGun.FindAction("Melee/Throw", throwIfNotFound: true);
         m_WeaponGun_Aim = m_WeaponGun.FindAction("Aim", throwIfNotFound: true);
         m_WeaponGun_Holster = m_WeaponGun.FindAction("Holster", throwIfNotFound: true);
+        m_WeaponGun_ToggleAimView = m_WeaponGun.FindAction("ToggleAimView", throwIfNotFound: true);
         // Vehicle/Ship
         m_VehicleShip = asset.FindActionMap("Vehicle/Ship", throwIfNotFound: true);
         m_VehicleShip_Pitch = m_VehicleShip.FindAction("Pitch", throwIfNotFound: true);
@@ -633,6 +654,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_WeaponGun_MeleeThrow;
     private readonly InputAction m_WeaponGun_Aim;
     private readonly InputAction m_WeaponGun_Holster;
+    private readonly InputAction m_WeaponGun_ToggleAimView;
     public struct WeaponGunActions
     {
         private @PlayerInputActions m_Wrapper;
@@ -643,6 +665,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         public InputAction @MeleeThrow => m_Wrapper.m_WeaponGun_MeleeThrow;
         public InputAction @Aim => m_Wrapper.m_WeaponGun_Aim;
         public InputAction @Holster => m_Wrapper.m_WeaponGun_Holster;
+        public InputAction @ToggleAimView => m_Wrapper.m_WeaponGun_ToggleAimView;
         public InputActionMap Get() { return m_Wrapper.m_WeaponGun; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -670,6 +693,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Holster.started += instance.OnHolster;
             @Holster.performed += instance.OnHolster;
             @Holster.canceled += instance.OnHolster;
+            @ToggleAimView.started += instance.OnToggleAimView;
+            @ToggleAimView.performed += instance.OnToggleAimView;
+            @ToggleAimView.canceled += instance.OnToggleAimView;
         }
 
         private void UnregisterCallbacks(IWeaponGunActions instance)
@@ -692,6 +718,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Holster.started -= instance.OnHolster;
             @Holster.performed -= instance.OnHolster;
             @Holster.canceled -= instance.OnHolster;
+            @ToggleAimView.started -= instance.OnToggleAimView;
+            @ToggleAimView.performed -= instance.OnToggleAimView;
+            @ToggleAimView.canceled -= instance.OnToggleAimView;
         }
 
         public void RemoveCallbacks(IWeaponGunActions instance)
@@ -800,6 +829,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         void OnMeleeThrow(InputAction.CallbackContext context);
         void OnAim(InputAction.CallbackContext context);
         void OnHolster(InputAction.CallbackContext context);
+        void OnToggleAimView(InputAction.CallbackContext context);
     }
     public interface IVehicleShipActions
     {

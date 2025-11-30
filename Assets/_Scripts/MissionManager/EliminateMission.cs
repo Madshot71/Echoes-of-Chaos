@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace GhostBoy.Mission
@@ -42,7 +43,7 @@ namespace GhostBoy.Mission
 
         public override string Info()
         {
-            return $"{info}:\nEliminated: {eliminatedCount}/{Targets.Count}";
+            return info;
         }
 
         public override bool RunCondition()
@@ -85,6 +86,11 @@ namespace GhostBoy.Mission
                     hitBox.OnDeath.RemoveListener(OnTargetEliminated);
                 }
             }
+        }
+
+        public override float Progress()
+        {
+            return eliminatedCount.DivideBy(Targets.Count);
         }
     }
 }

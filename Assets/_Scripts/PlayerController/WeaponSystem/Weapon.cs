@@ -14,6 +14,7 @@ public abstract class Weapon : MonoBehaviour
     [field : SerializeField] public Transform adsPoint {get; protected set;}
     public WeaponType weaponType;
 
+    public int currentAmmo {get; protected set;}
     internal abstract void Attack();
     internal abstract void Reload();
 
@@ -39,6 +40,7 @@ public abstract class Weapon : MonoBehaviour
     }
 
     internal abstract float ReloadProgress();
+    internal abstract int MaxAmmo();
 
     protected virtual void PlayAudio(AudioClip clip)
     {
@@ -49,6 +51,22 @@ public abstract class Weapon : MonoBehaviour
         
         audioSource.PlayOneShot(clip);
     }
+
+    public virtual void UpdateConfig()
+    {
+        _config.rightHandOffset = transform.localPosition;
+        _config.rightHandRotation = transform.localRotation;
+
+        if(LeftHandIK == null)
+        {
+            return;
+        }
+
+        _config.leftHandOffset = LeftHandIK.localPosition;
+        _config.leftHandRotation = LeftHandIK.localRotation;
+    }
+
+
     public enum WeaponType
     {
         Melee,

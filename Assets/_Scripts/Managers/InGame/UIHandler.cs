@@ -11,8 +11,12 @@ public class UIHandler : MonoBehaviour
     [SerializeField] private BarSlot mainsBars;
     [SerializeField] private List<BarSlot> bars = new();
 
+    [Header("CrossHair")]
+    [SerializeField] private Image crossHair;
+    [SerializeField] private Image reloadImage;
+
     [SerializeField] private TMP_Text interactTxt; 
-    [SerializeField] public float lerpSpeed{get; private set;}
+    [field : SerializeField] public float lerpSpeed {get; private set;}
     
     private void OnValidate()
     {
@@ -32,6 +36,8 @@ public class UIHandler : MonoBehaviour
             return;
         }
         Interact(main.interactable);
+
+        SetReload(main.data);
 
         //Update All bars
         mainsBars.UI(main.data);
@@ -62,6 +68,24 @@ public class UIHandler : MonoBehaviour
             return;
         }
         interactTxt.text = value;
+    }
+
+    private void SetReload(CharacterBase.Data data)
+    {
+        if(crossHair == null || reloadImage == null)
+        {
+            return;
+        }
+
+        if(data.reloadProgress > 0)
+        {
+            crossHair.enabled = false;
+            reloadImage.enabled = true;
+            reloadImage.fillAmount = data.reloadProgress;
+            return;
+        }
+        crossHair.enabled = true;
+        reloadImage.enabled = false;
     }
 }
 
